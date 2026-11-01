@@ -15,6 +15,7 @@ import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.provider.Settings;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.VpnService;
@@ -24,18 +25,24 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.text.InputType;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.text.TextUtils;
+import android.animation.LayoutTransition;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
+import android.view.ViewGroup;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.projectgamers.splitgate.engine.AppHints;
 import com.projectgamers.splitgate.engine.DohResolver;
@@ -61,6 +68,7 @@ public class MainActivity extends Activity {
     // Renkler
     private static final int BG = 0xFF0B1020;
     private static final int CARD = 0xFF141B2D;
+    private static final int CARD_HI = 0xFF18213A;
     private static final int STROKE = 0xFF222C45;
     private static final int CHIP_OFF = 0xFF1B2440;
     private static final int TEXT = 0xFFEAF0FF;
@@ -77,10 +85,24 @@ public class MainActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private SharedPreferences prefs;
 
+    private static final String KEY_WELCOME_DONE = "welcome_done";
+
     private PowerButton power;
-    private TextView statusTitle, statusSub;
+    private TextView statusTitle, statusSub, hintBtn, rateLegend;
     private TextView downVal, downSub, upVal, upSub, connVal, splitVal, dnsVal;
+    private Motion.Counter downCount, upCount, connCount, splitCount, dnsCount;
+    private Sparkline spark;
+    private ScrollView scrollView;
+    private Toaster toaster;
+    private Section testSection;
+    private LinearLayout testRows;
+    private BarView testBusy;
+    private Switch animSwitch;
+    private long pendingUntil;
+    private boolean pendingTarget;
     private final LinearLayout[] presetRows = new LinearLayout[Presets.ALL.length];
+    private final GradientDrawable[] presetBg = new GradientDrawable[Presets.ALL.length];
+    private final boolean[] presetOn = new boolean[Presets.ALL.length];
     private final TextView[] presetTitles = new TextView[Presets.ALL.length];
     private final TextView[] presetDescs = new TextView[Presets.ALL.length];
     private final TextView[] dnsChips = new TextView[DNS_IDS.length];
@@ -115,6 +137,14 @@ public class MainActivity extends Activity {
         return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    private void snack(int res, boolean longer) {
+        toaster.show(getString(res), longer);
+    }
+
+    private void snack(String text, boolean longer) {
+        toaster.show(text, longer);
+    }
+
     // ------------------------------------------------------------------ kurulum
 
     @Override
@@ -126,12 +156,14 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = getSharedPreferences(BypassVpnService.PREFS, MODE_PRIVATE);
+        Motion.refresh(this, prefs.getBoolean(Motion.KEY_ANIM, true));
         if (Build.VERSION.SDK_INT < 35) {
             getWindow().setStatusBarColor(BG);
             getWindow().setNavigationBarColor(BG);
         }
 
         ScrollView scroll = new ScrollView(this);
+        scrollView = scroll;
         scroll.setBackgroundColor(BG);
 
         LinearLayout root = new LinearLayout(this);
@@ -141,6 +173,7 @@ public class MainActivity extends Activity {
 
         buildHeader(root);
         buildPower(root);
+        buildWelcome(root);
         buildStats(root);
         buildSettings(root);
         buildApps(root);
@@ -194,10 +227,19 @@ public class MainActivity extends Activity {
                     b = insets.getSystemWindowInsetBottom();
                 }
                 v.setPadding(l, t, r, b);
+                if (toaster != null) toaster.setBottomInset(b);
                 return insets;
             }
         });
-        setContentView(scroll);
+        FrameLayout frame = new FrameLayout(this);
+        frame.setBackgroundColor(BG);
+        frame.addView(scroll, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        toaster = new Toaster(this, frame);
+        setContentView(frame);
+        // acilista kartlar sirayla asagidan yukari belirir
+        for (int i = 0; i < root.getChildCount(); i++) {
+            Motion.enter(root.getChildAt(i), Math.min(i, 9) * 55L, dp(16));
+        }
         String forNet = NetworkId.savedPreset(prefs, NetworkId.current(this));
         highlightPreset(forNet != null ? forNet : prefs.getString(BypassVpnService.KEY_PRESET, "sni"));
         selectDns(prefs.getString(BypassVpnService.KEY_DNS, "quad9"), false);
@@ -314,11 +356,62 @@ public class MainActivity extends Activity {
 
         statusTitle = tv(getString(R.string.status_off), 24, MUTED, true);
         statusTitle.setGravity(Gravity.CENTER);
+        statusTitle.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         root.addView(statusTitle, lp(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0, 0, 0, 0));
 
         statusSub = tv(getString(R.string.status_hint), 13, MUTED, false);
         statusSub.setGravity(Gravity.CENTER);
         root.addView(statusSub, lp(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0, 0, 0, dp(18)));
+
+        hintBtn = smallButton(getString(R.string.hint_find_method), new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openTest();
+            }
+        });
+        hintBtn.setPadding(dp(22), dp(11), dp(22), dp(11));
+        hintBtn.setVisibility(View.GONE);
+        LinearLayout.LayoutParams hlp = lp(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0, dp(-8), 0, dp(18));
+        hlp.gravity = Gravity.CENTER_HORIZONTAL;
+        root.addView(hintBtn, hlp);
+    }
+
+    /** Ilk acilista "3 adimda baglan" karti; kapatilinca bir daha cikmaz. */
+    private void buildWelcome(LinearLayout root) {
+        if (prefs.getBoolean(KEY_WELCOME_DONE, false)) return;
+        final LinearLayout c = card();
+        c.addView(tv(getString(R.string.welcome_title), 14, TEXT, true));
+        TextView t = tv(getString(R.string.welcome_text), 12, MUTED, false);
+        t.setPadding(0, dp(6), 0, dp(10));
+        c.addView(t);
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.addView(smallButton(getString(R.string.welcome_open), new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                openTest();
+            }
+        }), lp(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f, 0, 0, dp(4), 0));
+        row.addView(smallButton(getString(R.string.welcome_dismiss), new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                prefs.edit().putBoolean(KEY_WELCOME_DONE, true).apply();
+                Motion.setOpen(c, false);
+            }
+        }), lp(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f, dp(4), 0, 0, 0));
+        c.addView(row);
+        root.addView(c, lp(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0, 0, 0, dp(14)));
+    }
+
+    /** Test kartini acar ve ekrana kaydirir. */
+    private void openTest() {
+        testSection.set(true);
+        scrollView.post(new Runnable() {
+            @Override
+            public void run() {
+                scrollView.smoothScrollTo(0, Math.max(0, testSection.card.getTop() - dp(8)));
+            }
+        });
     }
 
     private void buildStats(LinearLayout root) {
@@ -328,7 +421,7 @@ public class MainActivity extends Activity {
         downVal = tv("0 B", 22, TEXT, true);
         downSub = tv("↓ —", 12, ACCENT, false);
         upVal = tv("0 B", 22, TEXT, true);
-        upSub = tv("↑ —", 12, ACCENT, false);
+        upSub = tv("↑ —", 12, Sparkline.UP, false);
 
         row.addView(statCard(getString(R.string.stat_downloaded), downVal, downSub), lp(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f, 0, 0, dp(6), 0));
         row.addView(statCard(getString(R.string.stat_uploaded), upVal, upSub), lp(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f, dp(6), 0, 0, 0));
@@ -345,6 +438,40 @@ public class MainActivity extends Activity {
         mrow.addView(miniStat(getString(R.string.stat_dns), dnsVal), lp(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f, 0, 0, 0, 0));
         mini.addView(mrow);
         root.addView(mini, lp(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0, 0, 0, dp(12)));
+
+        downCount = new Motion.Counter(downVal, new Motion.Counter.Format() {
+            @Override
+            public String text(long v) {
+                return Fmt.bytes(v);
+            }
+        });
+        upCount = new Motion.Counter(upVal, new Motion.Counter.Format() {
+            @Override
+            public String text(long v) {
+                return Fmt.bytes(v);
+            }
+        });
+        Motion.Counter.Format plain = new Motion.Counter.Format() {
+            @Override
+            public String text(long v) {
+                return String.valueOf(v);
+            }
+        };
+        connCount = new Motion.Counter(connVal, plain);
+        splitCount = new Motion.Counter(splitVal, plain);
+        dnsCount = new Motion.Counter(dnsVal, plain);
+
+        LinearLayout live = card();
+        LinearLayout lh = new LinearLayout(this);
+        lh.setOrientation(LinearLayout.HORIZONTAL);
+        lh.setGravity(Gravity.CENTER_VERTICAL);
+        lh.addView(tv(getString(R.string.live_traffic), 11, MUTED, true), lp(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f, 0, 0, 0, 0));
+        rateLegend = tv("", 11, MUTED, false);
+        lh.addView(rateLegend);
+        live.addView(lh);
+        spark = new Sparkline(this);
+        live.addView(spark, lp(LinearLayout.LayoutParams.MATCH_PARENT, dp(84), 0, 0, dp(8), 0, 0));
+        root.addView(live, lp(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0, 0, 0, dp(12)));
     }
 
     private void buildSettings(LinearLayout root) {
@@ -361,6 +488,12 @@ public class MainActivity extends Activity {
             TextView desc = tv(presetDesc(pr), 11, MUTED, false);
             row.addView(title);
             row.addView(desc);
+            GradientDrawable rbg = new GradientDrawable();
+            rbg.setCornerRadius(dp(12));
+            rbg.setColor(CHIP_OFF);
+            row.setBackground(ripple(rbg));
+            presetBg[i] = rbg;
+            Motion.pressable(row);
             row.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -391,7 +524,7 @@ public class MainActivity extends Activity {
             public void onClick(View v) {
                 NetworkId.forgetAll(prefs);
                 renderSavedNets();
-                Toast.makeText(MainActivity.this, R.string.nets_forgotten, Toast.LENGTH_SHORT).show();
+                snack(R.string.nets_forgotten, false);
             }
         }), lp(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0, dp(8), 0, 0));
         renderSavedNets();
@@ -428,7 +561,14 @@ public class MainActivity extends Activity {
 
     }
 
+    private void tint(Switch s) {
+        int[][] st = {{android.R.attr.state_checked}, {}};
+        s.setThumbTintList(new ColorStateList(st, new int[]{ACCENT, 0xFFB7C0DA}));
+        s.setTrackTintList(new ColorStateList(st, new int[]{0x662EE6A8, 0xFF2A3556}));
+    }
+
     private LinearLayout switchRow(String title, String desc, Switch sw) {
+        tint(sw);
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -470,15 +610,26 @@ public class MainActivity extends Activity {
         t.setGravity(Gravity.CENTER);
         t.setPadding(dp(8), dp(10), dp(8), dp(10));
         t.setOnClickListener(l);
+        Motion.pressable(t);
         return t;
     }
 
+    /** Secili / degil rengi yumusakca degistirir; arka plan ilk cagrida kurulur ve etikette saklanir. */
     private void styleChip(TextView chip, boolean on) {
-        GradientDrawable g = new GradientDrawable();
-        g.setCornerRadius(dp(12));
-        g.setColor(on ? ACCENT : CHIP_OFF);
-        chip.setBackground(g);
-        chip.setTextColor(on ? ON_ACCENT : MUTED);
+        GradientDrawable g;
+        if (chip.getTag() instanceof GradientDrawable) {
+            g = (GradientDrawable) chip.getTag();
+        } else {
+            g = new GradientDrawable();
+            g.setCornerRadius(dp(12));
+            g.setColor(CHIP_OFF);
+            chip.setBackground(ripple(g));
+            chip.setTag(g);
+        }
+        int to = on ? ACCENT : CHIP_OFF;
+        ColorStateList cur = g.getColor();
+        Motion.fill(g, chip, cur != null ? cur.getDefaultColor() : CHIP_OFF, to);
+        Motion.textColor(chip, on ? ON_ACCENT : MUTED);
     }
 
     private String appMode() {
@@ -513,7 +664,7 @@ public class MainActivity extends Activity {
             }
             sites = " \u00b7 " + getString(R.string.sites_summary, count);
         }
-        appsSummary.setText(a + sites);
+        showSummary(appsSummary, a + sites);
         if (pickAppsBtn != null) pickAppsBtn.setText(getString(R.string.apps_pick, n));
         for (int i = 0; i < appModeChips.length; i++) styleChip(appModeChips[i], (i == 1) == appMode().equals("only"));
         for (int i = 0; i < siteModeChips.length; i++) styleChip(siteModeChips[i], SITE_MODES[i].equals(sm));
@@ -622,9 +773,9 @@ public class MainActivity extends Activity {
             parsed = DomainFilter.parse(text);
         } catch (IllegalArgumentException e) {
             String m = e.getMessage();
-            Toast.makeText(this, m != null && m.startsWith("more than")
+            snack(m != null && m.startsWith("more than")
                     ? getString(R.string.sites_too_many, DomainFilter.MAX_DOMAINS)
-                    : getString(R.string.test_bad_domain, m), Toast.LENGTH_LONG).show();
+                    : getString(R.string.test_bad_domain, m), true);
             return;
         }
         String joined = android.text.TextUtils.join("\n", parsed);
@@ -632,8 +783,7 @@ public class MainActivity extends Activity {
         siteList.setText(joined);
         BypassVpnService.applySiteFilterLive(prefs);
         updateAppsSummary();
-        Toast.makeText(this, parsed.length == 0 && !siteMode().equals("all") ? R.string.sites_empty_note : R.string.sites_saved,
-                Toast.LENGTH_LONG).show();
+        snack(parsed.length == 0 && !siteMode().equals("all") ? R.string.sites_empty_note : R.string.sites_saved, true);
     }
 
     private static final class AppItem {
@@ -648,7 +798,7 @@ public class MainActivity extends Activity {
     private void pickApps() {
         if (pickingApps) return; // cift dokunusta iki pencere acilmasin
         pickingApps = true;
-        Toast.makeText(this, R.string.apps_loading, Toast.LENGTH_SHORT).show();
+        snack(R.string.apps_loading, false);
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -732,7 +882,12 @@ public class MainActivity extends Activity {
     }
 
     private void buildTest(LinearLayout root) {
-        LinearLayout c = collapsible(root, getString(R.string.section_test), false, null).body;
+        testSection = collapsible(root, getString(R.string.section_test), false, null);
+        LinearLayout c = testSection.body;
+        // durum / sonuc satirlari belirip kaybolurken alttakiler yumusakca kayar
+        LayoutTransition lt = new LayoutTransition();
+        lt.enableTransitionType(LayoutTransition.CHANGING);
+        c.setLayoutTransition(lt);
         TextView info = tv(getString(R.string.test_info), 12, MUTED, false);
         info.setPadding(0, dp(6), 0, dp(10));
         c.addView(info);
@@ -760,10 +915,19 @@ public class MainActivity extends Activity {
         });
         c.addView(testBtn);
 
+        testBusy = new BarView(this);
+        testBusy.setVisibility(View.GONE);
+        c.addView(testBusy, lp(LinearLayout.LayoutParams.MATCH_PARENT, dp(5), 0, 0, dp(10), 0, 0));
+
         testStatus = tv("", 12, ACCENT, false);
         testStatus.setPadding(0, dp(10), 0, 0);
         testStatus.setVisibility(View.GONE);
         c.addView(testStatus);
+
+        testRows = new LinearLayout(this);
+        testRows.setOrientation(LinearLayout.VERTICAL);
+        testRows.setPadding(0, dp(8), 0, 0);
+        c.addView(testRows);
 
         testResults = tv("", 12, TEXT, false);
         testResults.setTypeface(Typeface.MONOSPACE);
@@ -821,7 +985,7 @@ public class MainActivity extends Activity {
                         if (share) {
                             Report.share(MainActivity.this, body);
                         } else if (!Report.email(MainActivity.this, body)) {
-                            Toast.makeText(MainActivity.this, R.string.report_no_mail, Toast.LENGTH_LONG).show();
+                            snack(R.string.report_no_mail, true);
                             Report.share(MainActivity.this, body);
                         }
                     }
@@ -835,7 +999,7 @@ public class MainActivity extends Activity {
         try {
             domains = Probe.parseDomains(testDomains.getText().toString());
         } catch (IllegalArgumentException e) {
-            Toast.makeText(this, getString(R.string.test_bad_domain, e.getMessage()), Toast.LENGTH_LONG).show();
+            snack(getString(R.string.test_bad_domain, e.getMessage()), true);
             return;
         }
         String joined = TextUtils.join(", ", domains);
@@ -846,14 +1010,18 @@ public class MainActivity extends Activity {
         testBtn.setText(getString(R.string.test_running));
         testStatus.setVisibility(View.VISIBLE);
         testStatus.setText(getString(R.string.test_starting));
+        testRows.removeAllViews();
         testResults.setVisibility(View.GONE);
         applyBtn.setVisibility(View.GONE);
+        testBusy.setVisibility(View.VISIBLE);
+        testBusy.setIndeterminate(true);
         final String dnsId = prefs.getString(BypassVpnService.KEY_DNS, "quad9");
         new Thread(new Runnable() {
             @Override
             public void run() {
                 String text;
                 String best = null;
+                List<Probe.Result> results = null;
                 DohResolver resolver = new DohResolver(DohResolver.endpointsFor(dnsId));
                 try {
                     List<Probe.Result> res = Probe.runAll(resolver, domains,
@@ -863,11 +1031,12 @@ public class MainActivity extends Activity {
                                     handler.post(new Runnable() {
                                         @Override
                                         public void run() {
-                                            testStatus.setText(getString(R.string.test_progress, presetLabel(preset)));
+                                            Motion.swap(testStatus, getString(R.string.test_progress, presetLabel(preset)));
                                         }
                                     });
                                 }
                             }, AndroidTtl.INSTANCE);
+                    results = res;
                     best = Probe.best(res);
                     text = render(res);
                     BypassVpnService.lastResults = res;
@@ -882,19 +1051,24 @@ public class MainActivity extends Activity {
                 }
                 final String fText = text;
                 final String fBest = best;
+                final List<Probe.Result> fRes = results;
                 handler.post(new Runnable() {
                     @Override
                     public void run() {
                         testing = false;
                         testBtn.setText(getString(R.string.test_run));
                         bestId = fBest;
+                        testBusy.setIndeterminate(false);
+                        testBusy.setVisibility(View.GONE);
+                        if (fRes != null) showRows(fRes, fBest);
                         testResults.setText(fText);
-                        testResults.setVisibility(View.VISIBLE);
+                        testResults.setVisibility(fText.isEmpty() ? View.GONE : View.VISIBLE);
                         if (fBest != null) {
-                            testStatus.setText(getString(R.string.test_recommended, presetLabel(Presets.byId(fBest))));
+                            Motion.swap(testStatus, getString(R.string.test_recommended, presetLabel(Presets.byId(fBest))));
                             applyBtn.setVisibility(View.VISIBLE);
                         } else {
-                            testStatus.setText(getString(R.string.test_none));
+                            Motion.swap(testStatus, getString(R.string.test_none));
+                            Motion.shake(testStatus, dp(6));
                         }
                     }
                 });
@@ -905,17 +1079,39 @@ public class MainActivity extends Activity {
     private String render(List<Probe.Result> res) {
         StringBuilder sb = new StringBuilder();
         for (Probe.Result r : res) {
-            sb.append(String.format(java.util.Locale.US, "%-11s %d/%d", presetLabel(r.preset), r.ok, r.total));
-            if (r.avgMs >= 0) sb.append("  ").append(r.avgMs).append(" ms");
-            sb.append('\n');
-        }
-        for (Probe.Result r : res) {
             if (r.preset != Presets.NONE) continue;
             for (Map.Entry<String, Probe.DomainResult> e : r.domains.entrySet()) {
                 if (!e.getValue().ok) sb.append("\n").append(getString(R.string.test_baseline_err, e.getKey(), errText(e.getValue().err)));
             }
         }
         return sb.toString().trim();
+    }
+
+    /** Her yontem icin bir satir: ad, acilan site sayisi, sure ve dolan bir cubuk. En iyisi vurgulanir. */
+    private void showRows(List<Probe.Result> res, String best) {
+        testRows.removeAllViews();
+        int i = 0;
+        for (Probe.Result r : res) {
+            boolean isBest = best != null && r.preset.id.equals(best);
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(0, dp(6), 0, dp(6));
+            LinearLayout line = new LinearLayout(this);
+            line.setOrientation(LinearLayout.HORIZONTAL);
+            line.addView(tv((isBest ? "\u2605 " : "") + presetLabel(r.preset), 13, isBest ? ACCENT : TEXT, true),
+                    lp(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f, 0, 0, 0, 0));
+            String right = r.ok + "/" + r.total + (r.avgMs >= 0 ? "  \u00b7  " + r.avgMs + " ms" : "");
+            line.addView(tv(right, 12, MUTED, false));
+            row.addView(line);
+            BarView bar = new BarView(this);
+            bar.setColor(isBest ? ACCENT : (r.ok == r.total && r.total > 0 ? 0xFF5B8CFF : (r.ok > 0 ? AMBER : STROKE)));
+            row.addView(bar, lp(LinearLayout.LayoutParams.MATCH_PARENT, dp(6), 0, 0, dp(5), 0, 0));
+            row.setContentDescription(getString(R.string.test_row_cd, presetLabel(r.preset), r.ok, r.total));
+            testRows.addView(row);
+            bar.fillTo(r.total > 0 ? r.ok / (float) r.total : 0f, 80L * i);
+            Motion.enter(row, 80L * i, dp(10));
+            i++;
+        }
     }
 
     private void buildInfo(LinearLayout root) {
@@ -943,7 +1139,7 @@ public class MainActivity extends Activity {
             public void onClick(View v) {
                 ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                 cm.setPrimaryClip(ClipData.newPlainText("dpi-log", LogBuffer.dump()));
-                Toast.makeText(MainActivity.this, R.string.log_copied, Toast.LENGTH_SHORT).show();
+                snack(R.string.log_copied, false);
             }
         }), lp(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f, 0, 0, dp(4), 0));
         btns.addView(smallButton(getString(R.string.log_clear), new View.OnClickListener() {
@@ -978,6 +1174,19 @@ public class MainActivity extends Activity {
         c.addView(linkButton(getString(R.string.about_star), REPO_URL), lp(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0, 0, 0, dp(8)));
         c.addView(linkButton(getString(R.string.about_issues), REPO_URL + "/issues"), lp(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0, 0, 0, dp(8)));
         c.addView(linkButton(getString(R.string.about_linux), LINUX_URL), lp(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0, 0, 0, dp(10)));
+        c.addView(tv(getString(R.string.section_interface), 11, MUTED, true), lp(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0, dp(6), 0, dp(8)));
+        animSwitch = new Switch(this);
+        animSwitch.setChecked(prefs.getBoolean(Motion.KEY_ANIM, true));
+        animSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton b, boolean checked) {
+                prefs.edit().putBoolean(Motion.KEY_ANIM, checked).apply();
+                Motion.refresh(MainActivity.this, checked);
+                power.refresh();
+            }
+        });
+        c.addView(switchRow(getString(R.string.anim_title), getString(R.string.anim_desc), animSwitch),
+                lp(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 0, 0, 0, 0, dp(14)));
         c.addView(tv(getString(R.string.copyright), 11, MUTED, false));
     }
 
@@ -994,13 +1203,26 @@ public class MainActivity extends Activity {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (RuntimeException e) {
-            Toast.makeText(this, getString(R.string.link_failed, url), Toast.LENGTH_LONG).show();
+            snack(getString(R.string.link_failed, url), true);
         }
     }
 
     private static final class Section {
+        LinearLayout card;
         LinearLayout body;
         TextView summary;
+        TextView arrow;
+        Toggled onToggle;
+        boolean open;
+
+        /** Karti yukseklik animasyonuyla acar / kapatir, oku doner. */
+        void set(boolean now) {
+            if (now == open) return;
+            open = now;
+            Motion.setOpen(body, now);
+            arrow.animate().rotation(now ? 90f : 0f).setDuration(Motion.ms(220)).start();
+            if (onToggle != null) onToggle.run(now);
+        }
     }
 
     private interface Toggled {
@@ -1011,20 +1233,26 @@ public class MainActivity extends Activity {
     private Section collapsible(LinearLayout root, String title, boolean open, final Toggled onToggle) {
         final Section s = new Section();
         LinearLayout c = card();
+        s.card = c;
+        s.open = open;
+        s.onToggle = onToggle;
         LinearLayout head = new LinearLayout(this);
         head.setOrientation(LinearLayout.HORIZONTAL);
         head.setGravity(Gravity.CENTER_VERTICAL);
         head.setClickable(true);
+        head.setBackground(ripple(new GradientDrawable()));
         LinearLayout titles = new LinearLayout(this);
         titles.setOrientation(LinearLayout.VERTICAL);
         titles.addView(tv(title, 13, TEXT, true));
         s.summary = tv("", 12, MUTED, false);
         s.summary.setSingleLine(true);
         s.summary.setEllipsize(TextUtils.TruncateAt.END);
+        s.summary.setVisibility(View.GONE); // ozet yazilmayan kartlarda bos satir yer kaplamasin
         titles.addView(s.summary);
         head.addView(titles, lp(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f, 0, 0, 0, 0));
-        final TextView arrow = tv(open ? "\u25BE" : "\u25B8", 16, MUTED, true);
-        head.addView(arrow);
+        s.arrow = tv("\u25B8", 16, MUTED, true);
+        s.arrow.setRotation(open ? 90f : 0f);
+        head.addView(s.arrow);
         s.body = new LinearLayout(this);
         s.body.setOrientation(LinearLayout.VERTICAL);
         s.body.setPadding(0, dp(12), 0, 0);
@@ -1032,10 +1260,7 @@ public class MainActivity extends Activity {
         head.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                boolean now = s.body.getVisibility() != View.VISIBLE;
-                s.body.setVisibility(now ? View.VISIBLE : View.GONE);
-                arrow.setText(now ? "\u25BE" : "\u25B8");
-                if (onToggle != null) onToggle.run(now);
+                s.set(!s.open);
             }
         });
         c.addView(head);
@@ -1057,8 +1282,8 @@ public class MainActivity extends Activity {
         LinearLayout c = new LinearLayout(this);
         c.setOrientation(LinearLayout.VERTICAL);
         c.setPadding(dp(16), dp(14), dp(16), dp(14));
-        GradientDrawable g = new GradientDrawable();
-        g.setColor(CARD);
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{CARD_HI, CARD});
         g.setCornerRadius(dp(18));
         g.setStroke(dp(1), STROKE);
         c.setBackground(g);
@@ -1093,9 +1318,16 @@ public class MainActivity extends Activity {
         GradientDrawable g = new GradientDrawable();
         g.setColor(CHIP_OFF);
         g.setCornerRadius(dp(12));
-        t.setBackground(g);
+        t.setBackground(ripple(g));
         t.setOnClickListener(l);
+        Motion.pressable(t);
         return t;
+    }
+
+    /** Dokunma geri bildirimi: verilen arka planin ustune soluk beyaz dalga. */
+    private android.graphics.drawable.Drawable ripple(android.graphics.drawable.Drawable bg) {
+        return new android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(0x30FFFFFF), bg, null);
     }
 
     private LinearLayout.LayoutParams lp(int w, int h, float weight, int l, int t, int r, int b) {
@@ -1117,10 +1349,15 @@ public class MainActivity extends Activity {
         renderSavedNets();
     }
 
+    private void showSummary(TextView t, String text) {
+        t.setText(text);
+        t.setVisibility(text.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
     private void updateMethodSummary(String presetId) {
         if (methodSummary == null) return;
         String net = BypassVpnService.running ? BypassVpnService.networkLabel : null;
-        methodSummary.setText(presetLabel(Presets.byId(presetId)) + (net != null ? " \u00b7 " + net : ""));
+        showSummary(methodSummary, presetLabel(Presets.byId(presetId)) + (net != null ? " \u00b7 " + net : ""));
     }
 
     private void highlightPreset(String id) {
@@ -1129,12 +1366,12 @@ public class MainActivity extends Activity {
         updateMethodSummary(sel);
         for (int i = 0; i < Presets.ALL.length; i++) {
             boolean on = Presets.ALL[i].id.equals(sel);
-            GradientDrawable g = new GradientDrawable();
-            g.setCornerRadius(dp(12));
-            g.setColor(on ? ACCENT : CHIP_OFF);
-            presetRows[i].setBackground(g);
-            presetTitles[i].setTextColor(on ? ON_ACCENT : TEXT);
-            presetDescs[i].setTextColor(on ? ON_ACCENT : MUTED);
+            ColorStateList cur = presetBg[i].getColor();
+            Motion.fill(presetBg[i], presetRows[i], cur != null ? cur.getDefaultColor() : CHIP_OFF, on ? ACCENT : CHIP_OFF);
+            Motion.textColor(presetTitles[i], on ? ON_ACCENT : TEXT);
+            Motion.textColor(presetDescs[i], on ? ON_ACCENT : MUTED);
+            if (on && !presetOn[i] && presetRows[i].isShown()) Motion.pop(presetRows[i]);
+            presetOn[i] = on;
         }
     }
 
@@ -1147,17 +1384,14 @@ public class MainActivity extends Activity {
         }
         for (int i = 0; i < DNS_IDS.length; i++) {
             boolean on = DNS_IDS[i].equals(sel);
-            GradientDrawable g = new GradientDrawable();
-            g.setCornerRadius(dp(12));
-            g.setColor(on ? ACCENT : CHIP_OFF);
-            dnsChips[i].setBackground(g);
-            dnsChips[i].setTextColor(on ? ON_ACCENT : MUTED);
+            styleChip(dnsChips[i], on);
+            if (on && fromUser) Motion.pop(dnsChips[i]);
         }
     }
 
     private void notifyRestartNeeded() {
         if (BypassVpnService.running) {
-            Toast.makeText(this, R.string.restart_needed, Toast.LENGTH_SHORT).show();
+            snack(R.string.restart_needed, false);
         }
     }
 
@@ -1166,7 +1400,15 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        Motion.refresh(this, prefs.getBoolean(Motion.KEY_ANIM, true));
+        power.refresh();
         handler.post(ticker);
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (toaster != null) toaster.dispose();
+        super.onDestroy();
     }
 
     @Override
@@ -1178,7 +1420,12 @@ public class MainActivity extends Activity {
     // ------------------------------------------------------------------ baslat / durdur
 
     private void onToggle() {
+        power.performHapticFeedback(Build.VERSION.SDK_INT >= 30
+                ? HapticFeedbackConstants.CONFIRM : HapticFeedbackConstants.VIRTUAL_KEY);
         if (BypassVpnService.running) {
+            pendingTarget = false;
+            pendingUntil = SystemClock.elapsedRealtime() + 4000;
+            refresh();
             startService(new Intent(this, BypassVpnService.class).setAction(BypassVpnService.ACTION_STOP));
             handler.postDelayed(new Runnable() {
                 @Override
@@ -1203,7 +1450,7 @@ public class MainActivity extends Activity {
         if (requestCode != REQ_NOTIF) return;
         boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
         if (!granted) {
-            Toast.makeText(this, R.string.notif_denied, Toast.LENGTH_LONG).show();
+            snack(R.string.notif_denied, true);
         }
         prepareAndStart();
     }
@@ -1226,6 +1473,9 @@ public class MainActivity extends Activity {
     }
 
     private void startVpn() {
+        pendingTarget = true;
+        pendingUntil = SystemClock.elapsedRealtime() + 8000;
+        refresh();
         startService(new Intent(this, BypassVpnService.class).setAction(BypassVpnService.ACTION_START));
         handler.postDelayed(new Runnable() {
             @Override
@@ -1240,10 +1490,35 @@ public class MainActivity extends Activity {
     private void refresh() {
         boolean on = BypassVpnService.running;
         TunEngine e = BypassVpnService.current;
-        power.setOn(on);
+        long nowMs = SystemClock.elapsedRealtime();
+        // baslatiliyor / durduruluyor: servis durumu degisene kadar (en cok birkac saniye) bekleme animasyonu
+        boolean pending = pendingUntil != 0 && nowMs < pendingUntil && on != pendingTarget;
+        if (pendingUntil != 0 && !pending) pendingUntil = 0;
+        BypassVpnService.Check ck = BypassVpnService.check;
+
+        PowerButton.Look look;
+        if (pending) {
+            look = PowerButton.Look.BUSY;
+        } else if (!on) {
+            look = PowerButton.Look.OFF;
+        } else if (ck == BypassVpnService.Check.CHECKING) {
+            look = PowerButton.Look.BUSY;
+        } else if (ck == BypassVpnService.Check.IDLE) {
+            look = PowerButton.Look.WARN;
+        } else if (ck == BypassVpnService.Check.FAILED) {
+            look = PowerButton.Look.FAILED;
+        } else {
+            look = PowerButton.Look.WORKING;
+        }
+        power.setLook(look);
+        boolean showHint = on && !pending && ck == BypassVpnService.Check.FAILED;
+        if ((hintBtn.getVisibility() == View.VISIBLE) != showHint) {
+            hintBtn.setVisibility(showHint ? View.VISIBLE : View.GONE);
+            if (showHint) Motion.enter(hintBtn, 0, dp(8));
+        }
 
         if (on && e != null) {
-            long now = SystemClock.elapsedRealtime();
+            long now = nowMs;
             long down = e.bytesDown(), up = e.bytesUp();
             if (e != lastEngine) {
                 lastEngine = e;
@@ -1252,6 +1527,7 @@ public class MainActivity extends Activity {
                 lastTick = now;
                 downRate = 0;
                 upRate = 0;
+                spark.clear();
             } else if (now - lastTick >= 900) {
                 long dt = now - lastTick;
                 downRate = (down - lastDown) * 1000 / dt;
@@ -1259,6 +1535,8 @@ public class MainActivity extends Activity {
                 lastDown = down;
                 lastUp = up;
                 lastTick = now;
+                spark.push(downRate, upRate);
+                updateLegend();
             }
             String activeId = BypassVpnService.activePreset;
             Presets.Preset active = Presets.byId(activeId != null ? activeId : prefs.getString(BypassVpnService.KEY_PRESET, "sni"));
@@ -1267,9 +1545,8 @@ public class MainActivity extends Activity {
                 highlightPreset(active.id);
                 renderSavedNets();
             }
-            BypassVpnService.Check ck = BypassVpnService.check;
-            statusTitle.setText(getString(BypassVpnService.checkTitle(ck)));
-            statusTitle.setTextColor(ck == BypassVpnService.Check.FAILED ? WARN
+            Motion.swap(statusTitle, pending ? getString(R.string.status_stopping) : getString(BypassVpnService.checkTitle(ck)));
+            Motion.textColor(statusTitle, pending ? AMBER : ck == BypassVpnService.Check.FAILED ? WARN
                     : (ck == BypassVpnService.Check.CHECKING || ck == BypassVpnService.Check.IDLE) ? AMBER : ACCENT);
             StringBuilder sub = new StringBuilder(Fmt.duration(now - BypassVpnService.startedAt));
             String net = BypassVpnService.networkLabel;
@@ -1279,21 +1556,26 @@ public class MainActivity extends Activity {
             if (detail != null && ck == BypassVpnService.Check.WORKING) sub.append(" · ").append(getString(R.string.check_sites, detail));
             if (ck == BypassVpnService.Check.FAILED) sub.append("\n").append(verdictText(BypassVpnService.verdict));
             statusSub.setText(sub.toString());
-            downVal.setText(Fmt.bytes(down));
+            downCount.set(down);
             downSub.setText("↓ " + Fmt.rate(downRate, getString(R.string.per_second)));
-            upVal.setText(Fmt.bytes(up));
+            upCount.set(up);
             upSub.setText("↑ " + Fmt.rate(upRate, getString(R.string.per_second)));
-            connVal.setText(String.valueOf(e.activeTcp()));
-            splitVal.setText(String.valueOf(e.splitCount()));
-            dnsVal.setText(String.valueOf(e.dnsCount()));
+            connCount.set(e.activeTcp());
+            splitCount.set(e.splitCount());
+            dnsCount.set(e.dnsCount());
         } else {
+            if (lastEngine != null) {
+                spark.clear();
+                rateLegend.setText("");
+                spark.setContentDescription(null);
+            }
             lastEngine = null;
-            statusTitle.setText(getString(R.string.status_off));
-            statusTitle.setTextColor(MUTED);
-            statusSub.setText(getString(R.string.status_hint));
+            Motion.swap(statusTitle, pending && pendingTarget ? getString(R.string.status_starting) : getString(R.string.status_off));
+            Motion.textColor(statusTitle, pending && pendingTarget ? AMBER : MUTED);
+            statusSub.setText(pending && pendingTarget ? "" : getString(R.string.status_hint));
             downSub.setText("↓ —");
             upSub.setText("↑ —");
-            connVal.setText("0");
+            connCount.set(0);
         }
 
         int v = LogBuffer.version();
@@ -1301,5 +1583,22 @@ public class MainActivity extends Activity {
             shownLogVersion = v;
             logView.setText(LogBuffer.dump(80));
         }
+    }
+
+    /** Grafigin ustundeki renkli nokta + anlik hiz yazisi; ekran okuyucu icin de ozet verir. */
+    private void updateLegend() {
+        String per = getString(R.string.per_second);
+        String d = Fmt.rate(downRate, per), u = Fmt.rate(upRate, per);
+        SpannableStringBuilder sb = new SpannableStringBuilder();
+        int a = sb.length();
+        sb.append("● ");
+        sb.setSpan(new ForegroundColorSpan(Sparkline.DOWN), a, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        sb.append("↓ ").append(d).append("   ");
+        a = sb.length();
+        sb.append("● ");
+        sb.setSpan(new ForegroundColorSpan(Sparkline.UP), a, sb.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        sb.append("↑ ").append(u);
+        rateLegend.setText(sb);
+        spark.setContentDescription(getString(R.string.traffic_cd, d, u));
     }
 }

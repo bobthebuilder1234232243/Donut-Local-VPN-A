@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 package com.projectgamers.splitgate;
 
+import android.os.Build;
 import android.os.ParcelFileDescriptor;
 import android.system.ErrnoException;
 import android.system.Os;
@@ -21,6 +22,8 @@ final class AndroidTtl implements SocketTtl {
 
     @Override
     public boolean set(Socket s, int ttl) {
+        // Os.setsockoptInt Android 8'den (API 26) once yok: eski surumde NoSuchMethodError olurdu; TTL ayarlanamadi sayilir.
+        if (Build.VERSION.SDK_INT < 26) return false;
         ParcelFileDescriptor pfd = null;
         try {
             // fromSocket bir kopya (dup) verir; ayni soketi gosterir, kapatmak soketi kapatmaz.

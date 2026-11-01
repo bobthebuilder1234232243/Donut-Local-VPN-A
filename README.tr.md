@@ -133,6 +133,14 @@ Uygulamanın kendisi VPN dışında tutulur (`addDisallowedApplication`), bu yü
   engelli olan sitelerle değiştir (en çok 8, örn. `ornek.org, haber.ornek.net`). Varsayılanlar (discord.com,
   roblox.com, x.com, wattpad.com) yalnızca örnektir.
 - Katlanır **Günlük** bölümü (varsayılan kapalı): "Kopyala" ve "Temizle".
+- **Animasyonlu ve anlaşılır:** güç düğmesi ne olduğunu gösterir (bağlanırken dönen yay, çalışırken nabız atan yeşil
+  halkalar, çalışmazsa kırmızı ve bir sarsıntı); kartlar kayarak gelir, bölümler yumuşakça açılır, seçilen yöntem renk
+  değiştirir, test her yöntem için bir çubuk gösterir, canlı trafik grafiği indirme ve gönderme hızını çizer. İlk
+  açılışta kısa bir *3 adım* kartı yol gösterir; kontrol başarısız olursa *Çalışan bir yöntem bul* düğmesi çıkar.
+- **Pil dostu:** nabız, uygulamayı açtıktan sonra yalnızca birkaç saniye sürer, sonra ekran durgun kalır; uygulama
+  açık dursa da hiçbir şey yeniden çizilmez. Uygulama gizlenince animasyonlar durur; Android Pil Tasarrufu açıksa ya da
+  telefonun animasyon ölçeği 0 ise kendiliğinden kapanır, *Hakkında*'dan da elle kapatılabilir. VPN çalışırken bir
+  telefonda ölçüldü: uygulama açık ve boştayken bir çekirdeğin yaklaşık %0,6'sı, arka planda yaklaşık %0.
 - **Bildirim:** İlk başlatmada (Android 13+) bildirim izni istenir. Bağlıyken sessiz, kalıcı bir bildirim
   görünür: süre, ↓/↑ toplam ve hız, "Durdur" düğmesi. Bağlantı kapalıyken **hiçbir bildirim yoktur**.
   İzin verilmezse VPN yine çalışır, sadece bildirim görünmez.
@@ -222,11 +230,14 @@ başlığı, bağlantı yeniden kullanımı, chunked cevaplar, yedeğe geçiş).
 ```
 app/src/main/java/com/projectgamers/splitgate/
   MainActivity.java        arayüz (güç düğmesi, istatistik, yöntem, test, dil, günlük)
+  Motion.java              animasyon yardımcıları (tüm hareket tek yerden kapatılır)
+  Sparkline.java           canlı trafik grafiği; verisi RateWindow.java'da (bilgisayarda test edilir)
+  BarView.java             sonuç / ilerleme çubukları; Toaster.java: uygulama içi bildirimler
   NetworkId.java           hangi ağdayız; ağa göre kayıtlı yöntem
   AndroidTtl.java          kendi soketimizin TTL'i (Sıra bozma için)
   Report.java              sorun raporu (e-posta / paylaş)
   LocaleHelper.java        uygulama içi dil seçimi
-  PowerButton.java         güç düğmesi (özel çizim)
+  PowerButton.java         güç düğmesi (halkalar, dönen yay ve nabız ayrı görünümler)
   VpnTile.java             Hızlı Ayarlar kutucuğu (bağlan / kes)
   Fmt.java                 B/KB/MB/GB biçimlendirme
   BypassVpnService.java    VpnService + TUN G/Ç + durum bildirimi + ağ değişimi, otomatik test

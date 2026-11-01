@@ -71,6 +71,8 @@ public class VpnTile extends TileService {
         handler.postDelayed(revert, PENDING_MS);
     }
 
+    // API 34'ten once Intent'li surum gecerli; 34 ve sonrasi asagida PendingIntent ile ayrilir.
+    @android.annotation.SuppressLint("StartActivityAndCollapseDeprecated")
     private void openApp() {
         Intent open = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         if (Build.VERSION.SDK_INT >= 34) {

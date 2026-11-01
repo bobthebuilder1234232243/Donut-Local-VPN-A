@@ -5,3 +5,5 @@ cd "$(dirname "$0")/.."
 OUT="$(mktemp -d)"
 javac -encoding UTF-8 --release 17 -nowarn -d "$OUT" app/src/main/java/com/projectgamers/splitgate/engine/*.java tools/selftest/EngineSelfTest.java
 java -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -cp "$OUT" com.projectgamers.splitgate.engine.EngineSelfTest
+javac -encoding UTF-8 --release 17 -nowarn -d "$OUT" app/src/main/java/com/projectgamers/splitgate/RateWindow.java tools/selftest/UiSelfTest.java
+java -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -cp "$OUT" com.projectgamers.splitgate.UiSelfTest

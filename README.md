@@ -134,6 +134,14 @@ The app itself is excluded from the VPN (`addDisallowedApplication`), so there i
   above the button; change them to sites that are blocked for you (up to 8, e.g. `example.org, news.example.net`).
   The defaults (discord.com, roblox.com, x.com, wattpad.com) are only examples.
 - A collapsible **Log** section (closed by default): "Copy" and "Clear".
+- **Animated and easy to follow:** the power button shows what is happening (a spinning arc while connecting, pulsing green
+  rings when it works, red and a shake when it does not); cards slide in, sections open smoothly, the chosen method
+  changes colour, the test shows a bar per method, and a live traffic graph shows download and upload. A short
+  *3 steps* card helps on the first launch, and a *Find a working method* button appears when the check fails.
+- **Easy on the battery:** the pulse runs only for a few seconds after you open the app, then the screen is still, so
+  nothing is redrawn while it stays open. Animations stop when the app is hidden, turn off by themselves when
+  Android Battery Saver is on or the phone's animation scale is 0, and can be switched off in *About*. Measured on a
+  phone with the VPN running: about 0.6% of one core with the app open and idle, about 0% in the background.
 - **Notification:** On first start (Android 13+) the notification permission is requested. While connected
   a quiet, persistent notification shows: time, total ↓/↑ and speed, and a "Stop" button. While
   disconnected there is **no notification at all**. If the permission is not granted the VPN still works,
@@ -231,11 +239,14 @@ header, keep-alive, chunked replies, fallback).
 ```
 app/src/main/java/com/projectgamers/splitgate/
   MainActivity.java        UI (power button, stats, method, test, language, log)
+  Motion.java              animation helpers (all motion is switched off in one place)
+  Sparkline.java           live traffic graph; RateWindow.java holds its data (tested on a PC)
+  BarView.java             result / progress bars; Toaster.java: in-app notifications
   NetworkId.java           which network we are on; method saved per network
   AndroidTtl.java          TTL of our own socket (for Disorder)
   Report.java              problem report (e-mail / share)
   LocaleHelper.java        in-app language selection
-  PowerButton.java         power button (custom drawing)
+  PowerButton.java         power button (rings, spinner and pulse are separate views)
   VpnTile.java             Quick Settings tile (connect / disconnect)
   Fmt.java                 B/KB/MB/GB formatting
   BypassVpnService.java    VpnService + TUN I/O + status notification + network changes, auto test

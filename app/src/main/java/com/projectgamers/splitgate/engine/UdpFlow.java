@@ -38,9 +38,11 @@ final class UdpFlow {
     }
 
     private void readLoop() {
-        byte[] buf = new byte[65535];
+        // Tunel MTU'sunu (1472) asan paket zaten atlanir; 64 KB'lik tampon her akis icin gereksiz bellek ve cop yaratirdi.
+        byte[] buf = new byte[2048];
         try {
-            sock.setSoTimeout(5000);
+            // Bosta kalan akislari zamanlayici (timerLoop) kapatir; kisa zaman asimiyla her akisin surekli uyanmasi gerekmez (pil).
+            sock.setSoTimeout(30_000);
             while (!closed) {
                 DatagramPacket dp = new DatagramPacket(buf, buf.length);
                 try {

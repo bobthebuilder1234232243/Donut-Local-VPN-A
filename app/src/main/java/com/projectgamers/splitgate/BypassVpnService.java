@@ -645,23 +645,32 @@ public class BypassVpnService extends VpnService {
         t.start();
     }
 
+    // Bildirim her saniye yenilenir: kanal ve PendingIntent'ler her seferinde yeniden kurulmasin (pil, bellek).
+    private boolean channelMade;
+    private PendingIntent openPending, stopPending;
+
     private void postNotification(long up, long down, long upRate, long downRate, long elapsedMs) {
         try {
             NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
             if (nm == null) return;
-            if (Build.VERSION.SDK_INT >= 26) {
+            if (Build.VERSION.SDK_INT >= 26 && !channelMade) {
                 NotificationChannel ch = new NotificationChannel(CHANNEL_ID, getString(R.string.notif_channel), NotificationManager.IMPORTANCE_LOW);
                 ch.setShowBadge(false);
                 nm.createNotificationChannel(ch); // zaten varsa degistirmez
+                channelMade = true;
             }
             Notification.Builder nb = Build.VERSION.SDK_INT >= 26
                     ? new Notification.Builder(this, CHANNEL_ID)
                     : new Notification.Builder(this);
 
-            int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
-            PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), flags);
-            PendingIntent stop = PendingIntent.getService(this, 1,
-                    new Intent(this, BypassVpnService.class).setAction(ACTION_STOP), flags);
+            if (openPending == null) {
+                int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
+                openPending = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), flags);
+                stopPending = PendingIntent.getService(this, 1,
+                        new Intent(this, BypassVpnService.class).setAction(ACTION_STOP), flags);
+            }
+            PendingIntent open = openPending;
+            PendingIntent stop = stopPending;
 
             String line = "↓ " + Fmt.bytes(down) + "   ↑ " + Fmt.bytes(up);
             String perSecond = getString(R.string.per_second);

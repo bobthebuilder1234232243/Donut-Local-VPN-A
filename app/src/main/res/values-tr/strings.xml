@@ -140,4 +140,17 @@
     <string name="battery_text">Hiçbir uygulama kullanmıyorken SplitGate yalnızca paket geldiğinde ya da birkaç saniyede bir uyanır ve bildirimini yalnızca ekran açıkken günceller. Telefon onu arka planda durduruyorsa pil ayarlarında sınırsız çalışmasına izin ver.</string>
     <string name="battery_open">Pil ayarlarını aç</string>
     <string name="sites_too_many">Çok fazla site (en çok %1$d)</string>
+    <string name="live_traffic">CANLI TRAFİK</string>
+    <string name="traffic_cd">Canlı trafik grafiği: indirme %1$s, gönderme %2$s</string>
+    <string name="status_starting">Bağlanıyor…</string>
+    <string name="status_stopping">Bağlantı kesiliyor…</string>
+    <string name="hint_find_method">Çalışan bir yöntem bul</string>
+    <string name="welcome_title">Yeni misiniz? 3 adımda bağlanın</string>
+    <string name="welcome_text">1. TEST kartını açın ve “Yöntemleri dene”ye dokunun.\n2. “Önerileni uygula”ya dokunun.\n3. Büyük güç düğmesine dokunun.</string>
+    <string name="welcome_open">Test kartını aç</string>
+    <string name="welcome_dismiss">Anladım</string>
+    <string name="test_row_cd">%1$s: %3$d sitenin %2$d tanesi açıldı</string>
+    <string name="section_interface">ARAYÜZ</string>
+    <string name="anim_title">Animasyonlar</string>
+    <string name="anim_desc">Uygulamadaki akıcı hareketler. Telefonun animasyon ölçeği kapalıysa ya da Pil Tasarrufu açıksa bunlar da kapanır.</string>
 </resources>
