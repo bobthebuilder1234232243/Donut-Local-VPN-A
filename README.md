@@ -15,8 +15,8 @@ Project page: **https://techperson1234.github.io/Donut-VPN/**
 2. Press the big button and approve Android's VPN permission once.
 3. The label under the button reads **Connected**. Press the button again to stop; it reads
    **Disconnected**.
-4. The session card shows the device IP, the tunnel IP and how long the current session has been
-   running. Tap the gear to open settings.
+4. While connected, the session card shows the device IP, the tunnel IP and how long the current
+   session has been running. It disappears when you disconnect. Tap the gear to open settings.
 
 ## Settings
 

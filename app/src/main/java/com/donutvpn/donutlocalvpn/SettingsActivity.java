@@ -391,7 +391,6 @@ public class SettingsActivity extends Activity {
         logScroll.setPadding(dp(12), dp(10), dp(12), dp(10));
         logView = text("", 11, 0xFFB9C6E4, false);
         logView.setTypeface(Typeface.MONOSPACE);
-        logView.setTextIsSelectable(true);
         logView.setLineSpacing(dp(2), 1f);
         logScroll.addView(logView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -462,16 +461,37 @@ public class SettingsActivity extends Activity {
         String value = ConnectionLog.snapshot();
         if (value.isEmpty()) value = getString(R.string.log_empty);
         if (TextUtils.equals(value, lastLog)) return;
+        boolean followLatest = isLogAtBottom();
         lastLog = value;
         logView.setText(value);
-        if (logScroll != null) {
+        if (followLatest && logScroll != null) {
             logScroll.post(new Runnable() {
                 @Override
                 public void run() {
-                    logScroll.fullScroll(View.FOCUS_DOWN);
+                    logScroll.scrollTo(0, maxLogScroll());
                 }
             });
         }
+    }
+
+    /**
+     * Only follow new lines when the log was already at its bottom. If the user has scrolled up
+     * to read older entries, a refresh must leave that position alone.
+     */
+    private boolean isLogAtBottom() {
+        if (logScroll == null || logView == null) return true;
+        int viewport = logScroll.getHeight() - logScroll.getPaddingTop()
+                - logScroll.getPaddingBottom();
+        if (viewport <= 0) return true;
+        int max = Math.max(0, logView.getHeight() - viewport);
+        return logScroll.getScrollY() >= max - dp(24);
+    }
+
+    private int maxLogScroll() {
+        if (logScroll == null || logView == null) return 0;
+        int viewport = logScroll.getHeight() - logScroll.getPaddingTop()
+                - logScroll.getPaddingBottom();
+        return Math.max(0, logView.getHeight() - viewport);
     }
 
     // ------------------------------------------------------------------ drawing

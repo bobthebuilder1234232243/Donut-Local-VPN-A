@@ -53,6 +53,7 @@ public class MainActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private PowerButton power;
     private TextView status;
+    private View sessionCard;
     private TextView sessionDevice;
     private TextView sessionTunnel;
     private TextView sessionTime;
@@ -261,6 +262,8 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         cardLp.topMargin = dp(18);
         card.setLayoutParams(cardLp);
+        sessionCard = card;
+        card.setVisibility(View.GONE);
         return card;
     }
 
@@ -381,7 +384,18 @@ public class MainActivity extends Activity {
     }
 
     private void refreshSession() {
+        boolean connected = BypassVpnService.running && BypassVpnService.sessionStartedAt > 0;
+        if (sessionCard != null) {
+            int visibility = connected ? View.VISIBLE : View.GONE;
+            if (sessionCard.getVisibility() != visibility) sessionCard.setVisibility(visibility);
+        }
         if (sessionDevice == null || sessionTunnel == null || sessionTime == null) return;
+        if (!connected) {
+            setIfChanged(sessionDevice, getString(R.string.value_none));
+            setIfChanged(sessionTunnel, getString(R.string.value_none));
+            setIfChanged(sessionTime, getString(R.string.value_none));
+            return;
+        }
 
         String device = BypassVpnService.activeDeviceIp;
         if (device == null) device = AppSettings.deviceIp(this);
@@ -390,13 +404,9 @@ public class MainActivity extends Activity {
         setIfChanged(sessionDevice, device);
         setIfChanged(sessionTunnel, tunnel);
 
-        if (BypassVpnService.running && BypassVpnService.sessionStartedAt > 0) {
-            long seconds = Math.max(0,
-                    (SystemClock.elapsedRealtime() - BypassVpnService.sessionStartedAt) / 1000);
-            setIfChanged(sessionTime, formatDuration(seconds));
-        } else {
-            setIfChanged(sessionTime, getString(R.string.value_none));
-        }
+        long seconds = Math.max(0,
+                (SystemClock.elapsedRealtime() - BypassVpnService.sessionStartedAt) / 1000);
+        setIfChanged(sessionTime, formatDuration(seconds));
     }
 
     private void setIfChanged(TextView view, String value) {
