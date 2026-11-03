@@ -2,4 +2,8 @@
 <resources>
     <item name="power_button" type="id" />
     <item name="status_label" type="id" />
+    <item name="settings_button" type="id" />
+    <item name="session_device_ip" type="id" />
+    <item name="session_tunnel_ip" type="id" />
+    <item name="session_time" type="id" />
 </resources>

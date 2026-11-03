@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tagline">Découpage local des paquets · aucun serveur distant</string>
+    <string name="toggle_cd">Démarrer ou arrêter Donut Local VPN</string>
+    <string name="status_disconnected">Déconnecté</string>
+    <string name="status_connected">Connecté</string>
+    <string name="status_starting">Démarrage…</string>
+
+    <string name="settings">Paramètres</string>
+    <string name="settings_cd">Ouvrir les paramètres</string>
+    <string name="back">Retour</string>
+    <string name="session_details">Détails de la session</string>
+    <string name="device_ip">IP de l\'appareil</string>
+    <string name="tunnel_ip">IP du tunnel</string>
+    <string name="session_time">Durée de la session</string>
+
+    <string name="connection">Connexion</string>
+    <string name="auto_connect">Connexion automatique au démarrage</string>
+    <string name="auto_connect_desc">Démarre le tunnel local à l\'ouverture de l\'application.</string>
+
+    <string name="network_config">Configuration réseau</string>
+    <string name="network_desc">Les deux adresses doivent être dans le même sous-réseau /24. L\'IP du tunnel sert de passerelle DNS locale.</string>
+    <string name="network_applies">Reconnectez le tunnel pour appliquer les modifications réseau.</string>
+    <string name="save_network">Enregistrer le réseau</string>
+    <string name="reset_defaults">Rétablir les valeurs par défaut</string>
+    <string name="network_saved">Paramètres réseau enregistrés.</string>
+    <string name="network_reset">Paramètres réseau rétablis.</string>
+    <string name="error_invalid_device">Saisissez une adresse IPv4 valide pour l\'IP de l\'appareil.</string>
+    <string name="error_invalid_tunnel">Saisissez une adresse IPv4 valide pour l\'IP du tunnel.</string>
+    <string name="error_different_subnet">Les IP de l\'appareil et du tunnel doivent être dans le même sous-réseau /24.</string>
+    <string name="error_same_ip">Les IP de l\'appareil et du tunnel doivent être différentes.</string>
+
+    <string name="language">Langue</string>
+    <string name="language_desc">Choisissez la langue utilisée par Donut Local VPN.</string>
+    <string name="system_default">Langue du système</string>
+
+    <string name="connection_log">Journal de connexion</string>
+    <string name="connection_log_desc">Conservé uniquement dans la mémoire de cet appareil.</string>
+    <string name="clear_log">Effacer</string>
+    <string name="log_empty">Aucune activité de connexion pour le moment.</string>
+
+    <string name="notif_channel">État du VPN</string>
+    <string name="notif_stop">Arrêter</string>
+
+    <string name="log_permission_requested">En attente de l\'autorisation VPN.</string>
+    <string name="log_permission_denied">Autorisation VPN refusée.</string>
+    <string name="log_start_requested">Démarrage demandé.</string>
+    <string name="log_tun_up">Tunnel actif — appareil %1$s, tunnel %2$s.</string>
+    <string name="log_stop_requested">Arrêt demandé.</string>
+    <string name="log_stopped">Tunnel arrêté.</string>
+    <string name="log_vpn_failed">Impossible d\'établir le tunnel local.</string>
+</resources>

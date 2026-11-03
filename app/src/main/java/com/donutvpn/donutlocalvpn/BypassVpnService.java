@@ -6,6 +6,7 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
@@ -15,6 +16,7 @@ import android.net.NetworkCapabilities;
 import android.net.VpnService;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
+import android.os.SystemClock;
 import android.system.ErrnoException;
 import android.system.Os;
 import android.system.OsConstants;
@@ -43,9 +45,18 @@ public class BypassVpnService extends VpnService {
     /** Tunnel state, read by the single screen. */
     static volatile boolean running;
     static volatile boolean starting;
+    /** The addresses actually applied to the running tunnel, or null when it is not up. */
+    static volatile String activeDeviceIp;
+    static volatile String activeTunnelIp;
+    static volatile long sessionStartedAt;
 
     static boolean isOn() {
         return running || starting;
+    }
+
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(LocaleHelper.wrap(base));
     }
 
     private ParcelFileDescriptor tun;
@@ -89,14 +100,20 @@ public class BypassVpnService extends VpnService {
         if (engineThread != null) return;
         starting = true;
         running = false;
+        activeDeviceIp = null;
+        activeTunnelIp = null;
+        sessionStartedAt = 0;
+        String deviceIp = AppSettings.deviceIp(this);
+        String tunnelIp = AppSettings.tunnelIp(this);
+        ConnectionLog.add(getString(R.string.log_start_requested));
         startInForeground(buildNotification(false));
 
         Builder b = new Builder()
                 .setSession(getString(R.string.app_name))
                 .setMtu(1500)
-                .addAddress("10.7.0.1", 24)
+                .addAddress(deviceIp, 24)
                 .addRoute("0.0.0.0", 0)
-                .addDnsServer("10.7.0.2");
+                .addDnsServer(tunnelIp);
         try {
             // Our own traffic never enters the tunnel, so there is no loop.
             b.addDisallowedApplication(getPackageName());
@@ -111,6 +128,10 @@ public class BypassVpnService extends VpnService {
         }
         if (pfd == null) {
             // The VPN permission was not granted or the system refused the interface.
+            ConnectionLog.add(getString(R.string.log_vpn_failed));
+            activeDeviceIp = null;
+            activeTunnelIp = null;
+            sessionStartedAt = 0;
             starting = false;
             closeForeground();
             stopSelf();
@@ -121,7 +142,7 @@ public class BypassVpnService extends VpnService {
         FdIo io = new FdIo(pfd.getFileDescriptor());
         tunIo = io;
         doh = LocalCore.dns();
-        final TunEngine e = new TunEngine(io, LocalCore.strategy(), doh, new DirectConnector(), null);
+        final TunEngine e = new TunEngine(io, LocalCore.strategy(), doh, new DirectConnector(), ConnectionLog.engine());
         e.setSocketTtl(AndroidTtl.INSTANCE);
         engine = e;
         engineThread = new Thread(new Runnable() {
@@ -134,7 +155,11 @@ public class BypassVpnService extends VpnService {
                 }
             }
         }, "donut-engine");
+        activeDeviceIp = deviceIp;
+        activeTunnelIp = tunnelIp;
+        sessionStartedAt = SystemClock.elapsedRealtime();
         engineThread.start();
+        ConnectionLog.add(getString(R.string.log_tun_up, deviceIp, tunnelIp));
         watchNetwork();
         starting = false;
         running = true;
@@ -142,12 +167,18 @@ public class BypassVpnService extends VpnService {
     }
 
     private synchronized void stopVpn() {
+        boolean wasOn = isOn();
+        if (wasOn) ConnectionLog.add(getString(R.string.log_stop_requested));
         TunEngine e = engine;
         if (e != null) {
             e.stop(); // the engine thread ends and onEngineEnded() cleans up
         } else {
+            activeDeviceIp = null;
+            activeTunnelIp = null;
+            sessionStartedAt = 0;
             starting = false;
             running = false;
+            if (wasOn) ConnectionLog.add(getString(R.string.log_stopped));
             closeForeground();
             stopSelf();
         }
@@ -180,8 +211,12 @@ public class BypassVpnService extends VpnService {
         }
         engine = null;
         engineThread = null;
+        activeDeviceIp = null;
+        activeTunnelIp = null;
+        sessionStartedAt = 0;
         running = false;
         starting = false;
+        ConnectionLog.add(getString(R.string.log_stopped));
         closeForeground();
         stopSelf();
     }

@@ -47,6 +47,13 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    // The language picker uses resources directly; keep every locale in an app bundle.
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
 }
 
 // Uygulamanin kendisi bagimlilik kullanmaz; bunlar yalnizca instrumented smoke test icin.

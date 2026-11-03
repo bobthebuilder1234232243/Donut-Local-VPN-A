@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tagline">로컬 패킷 분할 · 원격 서버 없음</string>
+    <string name="toggle_cd">Donut Local VPN 시작 또는 중지</string>
+    <string name="status_disconnected">연결 끊김</string>
+    <string name="status_connected">연결됨</string>
+    <string name="status_starting">시작 중…</string>
+
+    <string name="settings">설정</string>
+    <string name="settings_cd">설정 열기</string>
+    <string name="back">뒤로</string>
+    <string name="session_details">세션 세부정보</string>
+    <string name="device_ip">기기 IP</string>
+    <string name="tunnel_ip">터널 IP</string>
+    <string name="session_time">세션 시간</string>
+
+    <string name="connection">연결</string>
+    <string name="auto_connect">실행 시 자동 연결</string>
+    <string name="auto_connect_desc">앱을 열 때 로컬 터널을 시작합니다.</string>
+
+    <string name="network_config">네트워크 구성</string>
+    <string name="network_desc">두 주소는 같은 /24 서브넷에 있어야 합니다. 터널 IP는 로컬 DNS 게이트웨이입니다.</string>
+    <string name="network_applies">네트워크 변경 내용을 적용하려면 터널을 다시 연결하세요.</string>
+    <string name="save_network">네트워크 저장</string>
+    <string name="reset_defaults">기본값 복원</string>
+    <string name="network_saved">네트워크 설정을 저장했습니다.</string>
+    <string name="network_reset">네트워크 설정을 복원했습니다.</string>
+    <string name="error_invalid_device">기기 IP에 올바른 IPv4 주소를 입력하세요.</string>
+    <string name="error_invalid_tunnel">터널 IP에 올바른 IPv4 주소를 입력하세요.</string>
+    <string name="error_different_subnet">기기 IP와 터널 IP는 같은 /24 서브넷에 있어야 합니다.</string>
+    <string name="error_same_ip">기기 IP와 터널 IP는 달라야 합니다.</string>
+
+    <string name="language">언어</string>
+    <string name="language_desc">Donut Local VPN에서 사용할 언어를 선택하세요.</string>
+    <string name="system_default">시스템 기본값</string>
+
+    <string name="connection_log">연결 로그</string>
+    <string name="connection_log_desc">이 기기의 메모리에만 보관됩니다.</string>
+    <string name="clear_log">지우기</string>
+    <string name="log_empty">아직 연결 활동이 없습니다.</string>
+
+    <string name="notif_channel">VPN 상태</string>
+    <string name="notif_stop">중지</string>
+
+    <string name="log_permission_requested">VPN 권한을 기다리는 중입니다.</string>
+    <string name="log_permission_denied">VPN 권한이 거부되었습니다.</string>
+    <string name="log_start_requested">시작을 요청했습니다.</string>
+    <string name="log_tun_up">터널 작동 중 — 기기 %1$s, 터널 %2$s.</string>
+    <string name="log_stop_requested">중지를 요청했습니다.</string>
+    <string name="log_stopped">터널을 중지했습니다.</string>
+    <string name="log_vpn_failed">로컬 터널을 만들지 못했습니다.</string>
+</resources>

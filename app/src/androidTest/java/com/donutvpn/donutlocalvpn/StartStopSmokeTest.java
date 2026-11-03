@@ -52,6 +52,9 @@ public class StartStopSmokeTest {
         Context context = targetContext();
         String pkg = context.getPackageName();
 
+        // Keep the test deterministic: no auto-connect and no language override from a previous run.
+        context.getSharedPreferences(AppSettings.PREFS, Context.MODE_PRIVATE).edit().clear().commit();
+
         String out = shell("appops set " + pkg + " ACTIVATE_VPN allow");
         if (Build.VERSION.SDK_INT >= 33) {
             shell("pm grant " + pkg + " android.permission.POST_NOTIFICATIONS");

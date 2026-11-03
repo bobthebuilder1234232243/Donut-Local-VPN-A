@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tagline">本機封包分割 · 沒有遠端伺服器</string>
+    <string name="toggle_cd">啟動或停止 Donut Local VPN</string>
+    <string name="status_disconnected">已中斷連線</string>
+    <string name="status_connected">已連線</string>
+    <string name="status_starting">正在啟動…</string>
+
+    <string name="settings">設定</string>
+    <string name="settings_cd">開啟設定</string>
+    <string name="back">返回</string>
+    <string name="session_details">工作階段詳細資料</string>
+    <string name="device_ip">裝置 IP</string>
+    <string name="tunnel_ip">通道 IP</string>
+    <string name="session_time">工作階段時間</string>
+
+    <string name="connection">連線</string>
+    <string name="auto_connect">啟動時自動連線</string>
+    <string name="auto_connect_desc">開啟應用程式時啟動本機通道。</string>
+
+    <string name="network_config">網路設定</string>
+    <string name="network_desc">兩個位址必須位於同一個 /24 子網路。通道 IP 是本機 DNS 閘道。</string>
+    <string name="network_applies">請重新連線通道以套用網路變更。</string>
+    <string name="save_network">儲存網路</string>
+    <string name="reset_defaults">還原預設值</string>
+    <string name="network_saved">已儲存網路設定。</string>
+    <string name="network_reset">已還原網路設定。</string>
+    <string name="error_invalid_device">請為裝置 IP 輸入有效的 IPv4 位址。</string>
+    <string name="error_invalid_tunnel">請為通道 IP 輸入有效的 IPv4 位址。</string>
+    <string name="error_different_subnet">裝置 IP 與通道 IP 必須位於同一個 /24 子網路。</string>
+    <string name="error_same_ip">裝置 IP 與通道 IP 必須不同。</string>
+
+    <string name="language">語言</string>
+    <string name="language_desc">選擇 Donut Local VPN 使用的語言。</string>
+    <string name="system_default">系統預設</string>
+
+    <string name="connection_log">連線記錄</string>
+    <string name="connection_log_desc">僅保存在此裝置的記憶體中。</string>
+    <string name="clear_log">清除</string>
+    <string name="log_empty">尚無連線活動。</string>
+
+    <string name="notif_channel">VPN 狀態</string>
+    <string name="notif_stop">停止</string>
+
+    <string name="log_permission_requested">正在等待 VPN 權限。</string>
+    <string name="log_permission_denied">VPN 權限遭到拒絕。</string>
+    <string name="log_start_requested">已要求啟動。</string>
+    <string name="log_tun_up">通道已啟動 — 裝置 %1$s，通道 %2$s。</string>
+    <string name="log_stop_requested">已要求停止。</string>
+    <string name="log_stopped">通道已停止。</string>
+    <string name="log_vpn_failed">無法建立本機通道。</string>
+</resources>
