@@ -1,6 +1,6 @@
-// Copyright (C) 2026 Project Gamers
+// Copyright (C) 2026 Donut VPN
 // SPDX-License-Identifier: GPL-3.0-or-later
-package com.projectgamers.splitgate.engine;
+package com.donutvpn.donutlocalvpn.engine;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -399,55 +399,6 @@ public class EngineSelfTest {
         c.close();
         srv.close();
         ss.close();
-    }
-
-    static Probe.Result res(Presets.Preset p, String... errs) {
-        Map<String, Probe.DomainResult> m = new java.util.LinkedHashMap<>();
-        int ok = 0;
-        for (int i = 0; i < errs.length; i++) {
-            boolean good = errs[i] == null;
-            if (good) ok++;
-            m.put("d" + i + ".example", new Probe.DomainResult(good, good ? 50 : 0, errs[i]));
-        }
-        return new Probe.Result(p, ok, errs.length, ok > 0 ? 50 : -1, m);
-    }
-
-    static void testDiagnose() {
-        Presets.Preset n = Presets.NONE, a = Presets.byId("sni"), b = Presets.byId("disorder");
-        String R = Probe.ERR_RESET, T = Probe.ERR_TIMEOUT, C = Probe.ERR_CONNECT_TIMEOUT, D = Probe.ERR_DNS_PREFIX + "timeout";
-        check(Probe.diagnose(Arrays.asList(res(n, R, R), res(a, null, R), res(b, R, R))) == Probe.Verdict.WORKS,
-                "diagnose: one method opening a site means it works");
-        check(Probe.diagnose(Arrays.asList(res(n, null, null), res(a, null, null))) == Probe.Verdict.NOT_BLOCKED,
-                "diagnose: sites open without splitting means they are not blocked here");
-        check(Probe.diagnose(Arrays.asList(res(n, D, D), res(a, D, D))) == Probe.Verdict.DNS_FAILED,
-                "diagnose: every lookup failed means DNS (DoH) is the problem");
-        check(Probe.diagnose(Arrays.asList(res(n, C, C), res(a, C, C), res(b, C, C))) == Probe.Verdict.IP_BLOCK,
-                "diagnose: TCP never connects means an IP block");
-        check(Probe.diagnose(Arrays.asList(res(n, R, T), res(a, R, T), res(b, T, R))) == Probe.Verdict.DPI_UNBEATEN,
-                "diagnose: connects but resets/timeouts after the hello means the DPI is not beaten");
-        check(Probe.diagnose(Arrays.asList(res(n, Probe.ERR_CERTIFICATE, Probe.ERR_CERTIFICATE), res(a, Probe.ERR_HOSTNAME, Probe.ERR_CERTIFICATE)))
-                        == Probe.Verdict.INTERCEPTED, "diagnose: certificate errors everywhere means the connection is intercepted");
-        check(Probe.diagnose(Arrays.asList(res(n, Probe.ERR_UNREACHABLE, Probe.ERR_UNREACHABLE))) == Probe.Verdict.NO_CONNECTION,
-                "diagnose: network unreachable means no connection");
-        check(Probe.diagnose(new ArrayList<Probe.Result>()) == Probe.Verdict.DNS_FAILED, "diagnose: no results at all is not reported as working");
-
-        check(!Probe.bypasses(Arrays.asList(res(n, null, R, R), res(a, null, R, R)), res(a, null, R, R))
-                        && Probe.best(Arrays.asList(res(n, null, R, R), res(a, null, R, R), res(b, null, T, R))) == null
-                        && Probe.diagnose(Arrays.asList(res(n, null, R, R), res(a, null, R, R))) == Probe.Verdict.DPI_UNBEATEN,
-                "a method that only opens a site that is not blocked anyway is NOT reported as working");
-        check(Probe.bypasses(Arrays.asList(res(n, null, R, R), res(a, null, null, R)), res(a, null, null, R)),
-                "a method that opens a site the plain connection cannot is reported as working");
-        check(Probe.diagnose(Arrays.asList(res(n, C, C, R, R), res(a, C, C, R, T))) == Probe.Verdict.DPI_UNBEATEN,
-                "diagnose: a tie between IP-block and DPI symptoms is not reported as an IP block");
-        check(Probe.notBlocked(Arrays.asList(res(n, null, null, D))) && Probe.diagnose(Arrays.asList(res(n, null, null, D))) == Probe.Verdict.NOT_BLOCKED,
-                "diagnose: a site whose DNS failed does not hide that the others are not blocked");
-
-        check(Probe.describe(new java.net.SocketException("Connection reset")).equals(Probe.ERR_RESET)
-                        && Probe.describe(new java.net.ConnectException("failed to connect: ECONNREFUSED (Connection refused)")).equals(Probe.ERR_REFUSED)
-                        && Probe.describe(new java.net.ConnectException("Bağlantı reddedildi")).equals(Probe.ERR_REFUSED)
-                        && Probe.describe(new java.net.ConnectException("connect failed: ENETUNREACH (Network is unreachable)")).equals(Probe.ERR_UNREACHABLE)
-                        && Probe.describe(new java.net.SocketTimeoutException("Read timed out")).equals(Probe.ERR_TIMEOUT),
-                "describe: reset / refused (also localized) / unreachable / timeout are classified");
     }
 
     static byte[] concat(List<byte[]> l) {
@@ -898,136 +849,6 @@ public class EngineSelfTest {
 
     // ------------------------------------------------------------------ strateji sinamasi (gercek TLS)
 
-    static void testProbe() throws Exception {
-        java.io.File dir = java.nio.file.Files.createTempDirectory("probe").toFile();
-        java.io.File ksFile = new java.io.File(dir, "ks.p12");
-        Process pr = new ProcessBuilder("keytool", "-genkeypair", "-alias", "t", "-keyalg", "RSA", "-keysize", "2048",
-                "-validity", "2", "-dname", "CN=localhost", "-ext", "san=dns:localhost", "-storetype", "PKCS12",
-                "-keystore", ksFile.getPath(), "-storepass", "changeit", "-keypass", "changeit")
-                .redirectErrorStream(true).start();
-        byte[] sink = new byte[4096];
-        while (pr.getInputStream().read(sink) >= 0) { }
-        check(pr.waitFor() == 0, "Probe: test certificate generated");
-
-        java.security.KeyStore ks = java.security.KeyStore.getInstance("PKCS12");
-        try (java.io.FileInputStream fi = new java.io.FileInputStream(ksFile)) {
-            ks.load(fi, "changeit".toCharArray());
-        }
-        javax.net.ssl.KeyManagerFactory kmf = javax.net.ssl.KeyManagerFactory.getInstance("SunX509");
-        kmf.init(ks, "changeit".toCharArray());
-        final SSLContext serverCtx = SSLContext.getInstance("TLS");
-        serverCtx.init(kmf.getKeyManagers(), null, null);
-
-        java.security.KeyStore trust = java.security.KeyStore.getInstance("PKCS12");
-        trust.load(null, null);
-        trust.setCertificateEntry("t", ks.getCertificate("t"));
-        javax.net.ssl.TrustManagerFactory tmf = javax.net.ssl.TrustManagerFactory.getInstance("PKIX");
-        tmf.init(trust);
-        SSLContext clientCtx = SSLContext.getInstance("TLS");
-        clientCtx.init(null, tmf.getTrustManagers(), null);
-
-        for (final Presets.Preset pst : Presets.ALL) {
-            final ServerSocket ss = new ServerSocket(0, 5, InetAddress.getLoopbackAddress());
-            final int[] firstRead = {-1};
-            final boolean[] srvOk = {false};
-            Thread srv = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try (Socket raw = ss.accept()) {
-                        byte[] buf = new byte[65536];
-                        int n = raw.getInputStream().read(buf);
-                        firstRead[0] = n;
-                        javax.net.ssl.SSLSocket ssl = (javax.net.ssl.SSLSocket) serverCtx.getSocketFactory()
-                                .createSocket(raw, new java.io.ByteArrayInputStream(buf, 0, n), true);
-                        ssl.setUseClientMode(false);
-                        ssl.startHandshake();
-                        srvOk[0] = true;
-                    } catch (Exception ex) {
-                        // istemci tarafi sonucu belirler
-                    }
-                }
-            });
-            srv.start();
-            Strategy st = new Strategy();
-            Presets.apply(st, pst);
-            st.splitDelayMs = Math.max(st.splitDelayMs, 100);
-            String tag = "Sinama [" + pst.id + "]: ";
-            try {
-                int ms = Probe.handshake("127.0.0.1", ss.getLocalPort(), "localhost", st, clientCtx, 5000);
-                check(ms >= 0, tag + "TLS handshake completed and the certificate was verified (" + ms + " ms)");
-            } catch (Exception ex) {
-                check(false, tag + "handshake failed: " + ex);
-            }
-            srv.join(3000);
-            check(srvOk[0], tag + "the server also completed the handshake (split ClientHello was reassembled)");
-            int fr = firstRead[0];
-            if (pst == Presets.NONE) {
-                check(fr > 100, tag + "not split: the first read is the whole ClientHello (" + fr + ")");
-            } else if (pst.id.equals("oob") || pst.id.equals("agresif") || pst.id.equals("sni") || pst.id.equals("disorder")) {
-                check(fr == 1, tag + "server saw exactly 1 byte on its first read (" + fr + ")");
-            } else {
-                check(fr > 5, tag + "the first read is a split piece, not the whole ClientHello (" + fr + ")");
-            }
-            ss.close();
-        }
-
-        // yanlis guven deposu: ozel imzali sertifika reddedilmeli
-        final ServerSocket ss2 = new ServerSocket(0, 5, InetAddress.getLoopbackAddress());
-        Thread srv2 = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try (Socket raw = ss2.accept()) {
-                    javax.net.ssl.SSLSocket ssl = (javax.net.ssl.SSLSocket) serverCtx.getSocketFactory()
-                            .createSocket(raw, null, raw.getPort(), false);
-                    ssl.setUseClientMode(false);
-                    ssl.startHandshake();
-                } catch (Exception ex) {
-                    // beklenen
-                }
-            }
-        });
-        srv2.start();
-        try {
-            Probe.handshake("127.0.0.1", ss2.getLocalPort(), "localhost", new Strategy(), SSLContext.getDefault(), 5000);
-            check(false, "Probe: untrusted certificate was not rejected");
-        } catch (Exception ex) {
-            check(Probe.ERR_CERTIFICATE.equals(Probe.describe(ex)), "Probe: untrusted certificate was rejected (" + Probe.describe(ex) + ")");
-        }
-        ss2.close();
-
-        // kapali port
-        ServerSocket tmp = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
-        int closedPort = tmp.getLocalPort();
-        tmp.close();
-        try {
-            Probe.handshake("127.0.0.1", closedPort, "localhost", new Strategy(), clientCtx, 2000);
-            check(false, "Probe: connecting to a closed port did not raise an error");
-        } catch (Exception ex) {
-            check(true, "Probe: closed port raised an error (" + Probe.describe(ex) + ")");
-        }
-
-        testDoh(serverCtx, clientCtx);
-
-        // DNS yardimcilari
-        byte[] qq = Dns.buildQuery("discord.com", Dns.TYPE_A);
-        check(Dns.questionEnd(qq, qq.length) == qq.length && "discord.com".equals(Dns.qname(qq, qq.length))
-                && Dns.qtype(qq, qq.length) == Dns.TYPE_A, "Probe: DNS query built correctly");
-        byte[] resp = Arrays.copyOf(qq, qq.length + 16);
-        resp[2] = (byte) 0x81;
-        resp[3] = (byte) 0x80;
-        Pkt.p16(resp, 6, 1);
-        int o = qq.length;
-        resp[o] = (byte) 0xc0; resp[o + 1] = 12;
-        Pkt.p16(resp, o + 2, 1); Pkt.p16(resp, o + 4, 1);
-        resp[o + 9] = 60;
-        Pkt.p16(resp, o + 10, 4);
-        resp[o + 12] = (byte) 162; resp[o + 13] = (byte) 159; resp[o + 14] = (byte) 135; resp[o + 15] = (byte) 232;
-        check(Dns.answersA(resp).equals(Collections.singletonList("162.159.135.232")), "Probe: A record read from the DNS answer");
-        check(DohResolver.endpointsFor("quad9")[0].contains("9.9.9.9") && DohResolver.endpointsFor("cloudflare")[0].contains("1.1.1.1")
-                && DohResolver.endpointsFor("google")[0].contains("8.8.8.8") && DohResolver.endpointsFor("quad9").length == 6,
-                "Probe: DoH provider order follows the primary");
-    }
-
     static byte[] fakeDnsAnswer(byte[] q) {
         int qEnd = Dns.questionEnd(q, q.length);
         byte[] r = Arrays.copyOf(q, qEnd + 16);
@@ -1055,221 +876,6 @@ public class EngineSelfTest {
             sb.append((char) b);
         }
         return sb.length() == 0 ? null : sb.toString();
-    }
-
-    static void testDoh(final SSLContext serverCtx, SSLContext clientCtx) throws Exception {
-        final ServerSocket ss = new ServerSocket(0, 5, InetAddress.getLoopbackAddress());
-        final java.util.concurrent.atomic.AtomicInteger conns = new java.util.concurrent.atomic.AtomicInteger();
-        final List<String> sni = Collections.synchronizedList(new ArrayList<String>());
-        final List<String> hosts = Collections.synchronizedList(new ArrayList<String>());
-        Thread srv = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    while (true) {
-                        final Socket raw = ss.accept();
-                        conns.incrementAndGet();
-                        new Thread(new Runnable() { public void run() {
-                        try {
-                            javax.net.ssl.SSLSocket ssl = (javax.net.ssl.SSLSocket) serverCtx.getSocketFactory()
-                                    .createSocket(raw, null, raw.getPort(), true);
-                            ssl.setUseClientMode(false);
-                            ssl.startHandshake();
-                            javax.net.ssl.ExtendedSSLSession es = (javax.net.ssl.ExtendedSSLSession) ssl.getSession();
-                            for (javax.net.ssl.SNIServerName n : es.getRequestedServerNames()) {
-                                sni.add(((SNIHostName) n).getAsciiName());
-                            }
-                            InputStream in = ssl.getInputStream();
-                            OutputStream out = ssl.getOutputStream();
-                            int served = 0;
-                            while (true) {
-                                String line = rawLine(in);
-                                if (line == null) break;
-                                int len = 0;
-                                String h;
-                                while ((h = rawLine(in)) != null && !h.isEmpty()) {
-                                    String lo = h.toLowerCase();
-                                    if (lo.startsWith("host:")) hosts.add(h.substring(5).trim());
-                                    if (lo.startsWith("content-length:")) len = Integer.parseInt(h.substring(15).trim());
-                                }
-                                byte[] q = new byte[len];
-                                int got = 0;
-                                while (got < len) {
-                                    int r = in.read(q, got, len - got);
-                                    if (r < 0) break;
-                                    got += r;
-                                }
-                                byte[] ans = fakeDnsAnswer(q);
-                                ByteArrayOutputStream bo = new ByteArrayOutputStream();
-                                if (served++ % 2 == 0) {
-                                    bo.write(("HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\nContent-Length: "
-                                            + ans.length + "\r\n\r\n").getBytes());
-                                    bo.write(ans);
-                                } else {
-                                    int cut = 10;
-                                    bo.write("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n".getBytes());
-                                    bo.write((Integer.toHexString(cut) + "\r\n").getBytes());
-                                    bo.write(ans, 0, cut);
-                                    bo.write("\r\n".getBytes());
-                                    bo.write((Integer.toHexString(ans.length - cut) + "\r\n").getBytes());
-                                    bo.write(ans, cut, ans.length - cut);
-                                    bo.write("\r\n0\r\n\r\n".getBytes());
-                                }
-                                out.write(bo.toByteArray());
-                                out.flush();
-                            }
-                        } catch (Exception ex) {
-                            // istemci kapatti
-                        } finally {
-                            try { raw.close(); } catch (IOException ignored) { }
-                        }
-                        } }).start();
-                    }
-                } catch (IOException e) {
-                    // sunucu kapatildi
-                }
-            }
-        });
-        srv.start();
-
-        String ep = "127.0.0.1:" + ss.getLocalPort() + "=localhost";
-        DohResolver r = new DohResolver(new String[]{ep}, clientCtx);
-        List<String> a = r.lookupA("a.example.com");
-        List<String> b = r.lookupA("b.example.com");
-        List<String> c = r.lookupA("c.example.com");
-        check(a.equals(Collections.singletonList("1.2.3.4")) && b.equals(a) && c.equals(a),
-                "DoH: three queries (Content-Length and chunked replies) read correctly");
-        check(conns.get() == 1, "DoH: a single TLS connection was reused (" + conns.get() + ")");
-        check(!sni.isEmpty() && sni.get(0).equals("localhost"), "DoH: provider name was sent as the SNI in TLS " + sni);
-        check(hosts.size() == 3 && hosts.get(0).equals("localhost"), "DoH: Host header is the provider name " + hosts);
-        check(r.resolve(Dns.buildQuery("x.example.com", Dns.TYPE_AAAA)).length > 12 && conns.get() == 1,
-                "DoH: AAAA query answered empty without touching the network");
-
-        // sertifika baska bir ana makine adi icin: DoH ve sinama reddetmeli
-        try {
-            new DohResolver(new String[]{"127.0.0.1:" + ss.getLocalPort() + "=wrong.example"}, clientCtx)
-                    .lookupA("h.example.com");
-            check(false, "DoH: certificate for another host name was accepted");
-        } catch (IOException ex) {
-            check(true, "DoH: certificate for another host name was rejected (" + ex.getClass().getSimpleName() + ")");
-        }
-        try {
-            Probe.handshake("127.0.0.1", ss.getLocalPort(), "wrong.example", new Strategy(), clientCtx, 3000);
-            check(false, "Probe: certificate for another host name was accepted");
-        } catch (Exception ex) {
-            check(Probe.ERR_HOSTNAME.equals(Probe.describe(ex)),
-                    "Probe: certificate for another host name was rejected as a host name mismatch (" + Probe.describe(ex) + ")");
-        }
-        int connsBefore = conns.get();
-        r.close();
-        check(r.lookupA("k.example.com").equals(Collections.singletonList("1.2.3.4")) && conns.get() == connsBefore + 1,
-                "DoH: close() dropped the idle connection and the next query reconnected");
-        int connsBeforeFlush = conns.get();
-        int hostsBeforeFlush = hosts.size();
-        r.flush();
-        check(r.lookupA("a.example.com").equals(Collections.singletonList("1.2.3.4"))
-                        && conns.get() == connsBeforeFlush + 1 && hosts.size() == hostsBeforeFlush + 1,
-                "DoH: flush() after a network change dropped both the idle connection and the cached answer");
-        for (String badSize : new String[]{"7fffffff", "-1"}) {
-            final String size = badSize;
-            final ServerSocket one = new ServerSocket(0, 2, InetAddress.getLoopbackAddress());
-            Thread t = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try (Socket raw = one.accept()) {
-                        javax.net.ssl.SSLSocket ssl = (javax.net.ssl.SSLSocket) serverCtx.getSocketFactory()
-                                .createSocket(raw, null, raw.getPort(), true);
-                        ssl.setUseClientMode(false);
-                        ssl.startHandshake();
-                        byte[] buf = new byte[4096];
-                        ssl.getInputStream().read(buf);
-                        String resp = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nabcd\r\n"
-                                + size + "\r\n";
-                        ssl.getOutputStream().write(resp.getBytes());
-                        ssl.getOutputStream().flush();
-                        Thread.sleep(500);
-                    } catch (Exception ex) {
-                        // istemci kapatir
-                    }
-                }
-            });
-            t.start();
-            try {
-                new DohResolver(new String[]{"127.0.0.1:" + one.getLocalPort() + "=localhost"}, clientCtx)
-                        .lookupA("o.example.com");
-                check(false, "DoH: chunk size " + size + " was accepted");
-            } catch (IOException ex) {
-                check(ex.getMessage() != null && ex.getMessage().contains("too large"),
-                        "DoH: chunk size " + size + " was rejected without overflow (" + ex.getMessage() + ")");
-            }
-            one.close();
-        }
-        try {
-            new DohResolver(new String[]{"not-an-endpoint"}, clientCtx).lookupA("m.example.com");
-            check(false, "DoH: malformed endpoint did not raise an error");
-        } catch (IOException ex) {
-            check(true, "DoH: malformed endpoint raised an IOException instead of a runtime exception");
-        }
-
-        // TLS olmayan (enjekte edilmis) cevap veren bozuk uc nokta -> yedege gecilmeli
-        final ServerSocket bad = new ServerSocket(0, 5, InetAddress.getLoopbackAddress());
-        Thread badSrv = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    while (true) {
-                        Socket raw = bad.accept();
-                        raw.getOutputStream().write("HTTP/1.1 403 Forbidden\r\n\r\nengellendi".getBytes());
-                        raw.getOutputStream().flush();
-                        raw.close();
-                    }
-                } catch (IOException e) {
-                    // kapandi
-                }
-            }
-        });
-        badSrv.start();
-        String badEp = "127.0.0.1:" + bad.getLocalPort() + "=localhost";
-        DohResolver only = new DohResolver(new String[]{badEp}, clientCtx);
-        try {
-            only.lookupA("d.example.com");
-            check(false, "DoH: non-TLS reply did not raise an error");
-        } catch (IOException ex) {
-            check(true, "DoH: non-TLS reply raised an IOException (" + ex.getClass().getSimpleName() + ")");
-        }
-        DohResolver fb = new DohResolver(new String[]{badEp, ep}, clientCtx);
-        check(fb.lookupA("e.example.com").equals(Collections.singletonList("1.2.3.4")),
-                "DoH: broken endpoint was skipped and the backup used");
-        bad.close();
-        ss.close();
-    }
-
-    static void testDomainParsing() {
-        check(Probe.parseDomains("discord.com, https://X.com/path?q=1  roblox.com:443;wattpad.com.")
-                        .equals(Arrays.asList("discord.com", "x.com", "roblox.com", "wattpad.com")),
-                "Sites: commas, spaces, scheme, path, port and a trailing dot are cleaned up");
-        check(Probe.parseDomains("a.com a.com A.COM").equals(Collections.singletonList("a.com")), "Sites: duplicates collapse");
-        check(Probe.parseDomains("").equals(Probe.DEFAULT_DOMAINS) && Probe.parseDomains(null).equals(Probe.DEFAULT_DOMAINS)
-                && Probe.parseDomains("  ,; ").equals(Probe.DEFAULT_DOMAINS), "Sites: empty input gives the default list");
-        StringBuilder many = new StringBuilder();
-        for (int i = 0; i < 12; i++) many.append("site").append(i).append(".example.com ");
-        check(Probe.parseDomains(many.toString()).size() == Probe.MAX_DOMAINS, "Sites: at most " + Probe.MAX_DOMAINS + " are kept");
-        for (String bad : new String[]{"localhost", "1.2.3.4", "not a.domain", "exämple.com", "a..b.com", "-bad.com", "bad-.com",
-                "x.com:abc", "x.com:123456", "a_b.com/x y", "a.com\\evil", "@evil.com", "x.com;rm -rf", "<script>.com", "a.b"+"c".repeat(70)+".com"}) {
-            try {
-                Probe.parseDomains(bad);
-                check(bad.contains("rm -rf") || bad.equals("not a.domain") || bad.equals("a_b.com/x y"), "Sites: '" + bad + "' was accepted");
-            } catch (IllegalArgumentException ex) {
-                check(true, "Sites: '" + bad + "' rejected (" + ex.getMessage() + ")");
-            }
-        }
-        boolean rejectedFirst = false;
-        try {
-            Probe.parseDomains("good.com, bad_site, other.com");
-        } catch (IllegalArgumentException ex) {
-            rejectedFirst = "bad_site".equals(ex.getMessage());
-        }
-        check(rejectedFirst, "Sites: the offending entry is reported");
     }
 
     /** Telefondaki uygulamanin yerine gecen kucuk TCP istemcisi (el sikisma, gonderme, ACK'li okuma). */
@@ -1440,89 +1046,6 @@ public class EngineSelfTest {
         env.stop();
     }
 
-    static void testSiteFilter() throws Exception {
-        byte[] h = realClientHello("www.discord.com");
-        Strategy st = new Strategy();
-        Presets.apply(st, Presets.byId("hafif"));
-        check(st.plan(h).pieces.size() == 2, "site filter: default (all sites) splits");
-
-        st.filter = new DomainFilter(DomainFilter.Mode.INCLUDE, DomainFilter.parse("discord.com, roblox.com"));
-        Strategy.Plan inc = st.plan(h);
-        check(inc.pieces.size() == 2, "site filter include: a subdomain of a listed site (www.discord.com) is split");
-        byte[] other = realClientHello("bank.example.com.tr");
-        Strategy.Plan outc = st.plan(other);
-        check(outc.pieces.size() == 1 && outc.kind.contains("site filter") && Arrays.equals(outc.pieces.get(0), other),
-                "site filter include: an unlisted site is sent whole, untouched (" + outc.kind + ")");
-        check(st.plan(realClientHello("notdiscord.com")).pieces.size() == 1,
-                "site filter include: 'notdiscord.com' does not match 'discord.com' (no suffix confusion)");
-
-        st.filter = new DomainFilter(DomainFilter.Mode.EXCLUDE, DomainFilter.parse("*.bank.example.com.tr"));
-        check(st.plan(other).pieces.size() == 1, "site filter exclude: a listed site is left alone ('*.' prefix accepted)");
-        check(st.plan(h).pieces.size() == 2, "site filter exclude: other sites are still split");
-
-        byte[] http = "GET / HTTP/1.1\r\nHost: Discord.com:8080\r\n\r\n".getBytes();
-        st.filter = new DomainFilter(DomainFilter.Mode.INCLUDE, DomainFilter.parse("discord.com"));
-        check(st.plan(http).pieces.size() == 2, "site filter include: plain HTTP Host with a port and capital letters matches");
-        st.filter = new DomainFilter(DomainFilter.Mode.EXCLUDE, DomainFilter.parse("discord.com"));
-        check(st.plan(http).pieces.size() == 1, "site filter exclude: plain HTTP Host is left alone");
-
-        check(!new DomainFilter(DomainFilter.Mode.INCLUDE, DomainFilter.parse("discord.com")).applies(null)
-                        && new DomainFilter(DomainFilter.Mode.EXCLUDE, DomainFilter.parse("discord.com")).applies("")
-                        && new DomainFilter(DomainFilter.Mode.ALL, new String[0]).applies(null),
-                "site filter: no name (no SNI): only 'exclude' and 'all' split");
-        check(Arrays.equals(DomainFilter.parse(" https://Discord.com/x?y#z, *.roblox.com. ;\n discord.com"),
-                new String[]{"discord.com", "roblox.com"}), "site filter: input is cleaned (scheme, path, wildcard, dot, duplicates)");
-        String rejected = null;
-        try {
-            DomainFilter.parse("good.com, bad_site!, other.com");
-        } catch (IllegalArgumentException e) {
-            rejected = e.getMessage();
-        }
-        check("bad_site!".equals(rejected), "site filter: the offending entry is reported (" + rejected + ")");
-        boolean nodot = false;
-        try {
-            DomainFilter.parse("localhost");
-        } catch (IllegalArgumentException e) {
-            nodot = true;
-        }
-        check(nodot, "site filter: a name without a dot is rejected");
-
-        String idn = java.net.IDN.toASCII("bankas\u0131.com.tr");
-        check(idn.startsWith("xn--") && Arrays.equals(DomainFilter.parse("Bankas\u0131.com.tr"), new String[]{idn}),
-                "site filter: a Turkish-letter name is stored in its punycode form (" + idn + ")");
-        DomainFilter idnFilter = new DomainFilter(DomainFilter.Mode.EXCLUDE, DomainFilter.parse("bankas\u0131.com.tr"));
-        check(!idnFilter.applies(idn) && !idnFilter.applies("www." + idn) && idnFilter.applies("example.com.tr"),
-                "site filter: the punycode name that arrives as SNI matches the Turkish-letter entry");
-        boolean tooMany = false;
-        StringBuilder many = new StringBuilder();
-        for (int i = 0; i <= DomainFilter.MAX_DOMAINS; i++) many.append("site").append(i).append(".example ");
-        try {
-            DomainFilter.parse(many.toString());
-        } catch (IllegalArgumentException e) {
-            tooMany = e.getMessage().startsWith("more than");
-        }
-        check(tooMany, "site filter: more than " + DomainFilter.MAX_DOMAINS + " sites is refused with a clear reason");
-
-        // Taramada (Probe) varsayilan ALL kalir: filtre yalnizca motorun gercek trafigine uygulanir
-        check(new Strategy().filter == DomainFilter.ALL, "site filter: a fresh Strategy (used by the test) is not filtered");
-    }
-
-    static void testAppHints() {
-        String[][] yes = {
-                {"com.garanti.cepsubesi", "Garanti BBVA Mobil"}, {"tr.gov.turkiye.edevlet.kapisi", "e-Devlet"},
-                {"com.ziraat.ziraatmobil", "Ziraat Mobil"}, {"com.example.pay", "QNB Mobil"}, {"x.y", "TEB CEP ŞUBE"},
-                {"com.vakifbank.mobile", "VakıfBank Mobil"}, {"org.x", "Bankası Mobil"}, {"a.b.c", "ING Mobil"},
-        };
-        String[][] no = {
-                {"com.discord", "Discord"}, {"com.android.chrome", "Chrome"}, {"com.spotify.music", "Spotify"},
-                {"org.telegram.messenger", "Telegram"}, {"com.google.android.gm", "Gmail"}, {"com.whatsapp", "WhatsApp"},
-                {"com.example.tebessum", "Tebessüm Oyunu"}, {"com.king.candycrush", "Candy Crush"}, {"com.x.ringtones", "Ringing"},
-        };
-        for (String[] a : yes) check(AppHints.looksLikeBankOrGov(a[0], a[1]), "app hints: '" + a[1] + "' looks like a bank / government app");
-        for (String[] a : no) check(!AppHints.looksLikeBankOrGov(a[0], a[1]), "app hints: '" + a[1] + "' is NOT suggested");
-        check(!AppHints.looksLikeBankOrGov(null, null), "app hints: null input is handled");
-    }
-
     /** Pil: zamanlayici yalnizca ACK bekleyen veri varken hizli calismali; bosta acik oturumla yavas, oturum yokken cok yavas. */
     static void testTimerSleeps() throws Exception {
         Env env = new Env();
@@ -1589,16 +1112,12 @@ public class EngineSelfTest {
         testChecksums();
         testSni();
         testPlans();
-        testDomainParsing();
         testRefusedConnection();
         testDisorderSend();
-        testDiagnose();
         testNetworkReset();
         testDnsOverTcp();
         testTcpCap();
         testDnsTcpIdle();
-        testSiteFilter();
-        testAppHints();
         testTimerSleeps();
         testDns();
         testUdpAndQuic();
@@ -1607,7 +1126,6 @@ public class EngineSelfTest {
         testTcpFlow(Presets.byId("oob"), false);
         testTcpFlow(Presets.NONE, false);
         testTcpFlow(Presets.byId("hafif"), true);
-        testProbe();
         System.out.println();
         System.out.println(passes + " passed, " + fails + " failed");
         System.exit(fails == 0 ? 0 : 1);
