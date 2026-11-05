@@ -13,10 +13,14 @@
     <string name="device_ip">IP dispositivo</string>
     <string name="tunnel_ip">IP tunnel</string>
     <string name="session_time">Durata sessione</string>
+    <string name="value_on">Attiva</string>
+    <string name="value_off">Disattivata</string>
 
     <string name="connection">Connessione</string>
     <string name="auto_connect">Connessione automatica all\'avvio</string>
     <string name="auto_connect_desc">Avvia il tunnel locale all\'apertura dell\'app.</string>
+    <string name="dpi">Ispezione approfondita dei pacchetti (DPI)</string>
+    <string name="dpi_desc">Attiva lo stato DPI mostrato nei dettagli della sessione.</string>
 
     <string name="network_config">Configurazione di rete</string>
     <string name="network_desc">Entrambi gli indirizzi devono essere nella stessa sottorete /24. L\'IP del tunnel è il gateway DNS locale.</string>

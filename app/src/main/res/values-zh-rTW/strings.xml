@@ -13,10 +13,14 @@
     <string name="device_ip">裝置 IP</string>
     <string name="tunnel_ip">通道 IP</string>
     <string name="session_time">工作階段時間</string>
+    <string name="value_on">開啟</string>
+    <string name="value_off">關閉</string>
 
     <string name="connection">連線</string>
     <string name="auto_connect">啟動時自動連線</string>
     <string name="auto_connect_desc">開啟應用程式時啟動本機通道。</string>
+    <string name="dpi">深度封包檢測 (DPI)</string>
+    <string name="dpi_desc">啟用工作階段詳細資料中顯示的 DPI 狀態。</string>
 
     <string name="network_config">網路設定</string>
     <string name="network_desc">兩個位址必須位於同一個 /24 子網路。通道 IP 是本機 DNS 閘道。</string>

@@ -13,10 +13,14 @@
     <string name="device_ip">기기 IP</string>
     <string name="tunnel_ip">터널 IP</string>
     <string name="session_time">세션 시간</string>
+    <string name="value_on">켜짐</string>
+    <string name="value_off">꺼짐</string>
 
     <string name="connection">연결</string>
     <string name="auto_connect">실행 시 자동 연결</string>
     <string name="auto_connect_desc">앱을 열 때 로컬 터널을 시작합니다.</string>
+    <string name="dpi">심층 패킷 검사(DPI)</string>
+    <string name="dpi_desc">세션 세부정보에 표시되는 DPI 상태를 켭니다.</string>
 
     <string name="network_config">네트워크 구성</string>
     <string name="network_desc">두 주소는 같은 /24 서브넷에 있어야 합니다. 터널 IP는 로컬 DNS 게이트웨이입니다.</string>

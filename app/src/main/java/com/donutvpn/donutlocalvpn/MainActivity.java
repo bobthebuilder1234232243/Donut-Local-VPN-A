@@ -57,6 +57,7 @@ public class MainActivity extends Activity {
     private TextView sessionDevice;
     private TextView sessionTunnel;
     private TextView sessionTime;
+    private TextView sessionDpi;
     private boolean ticking;
     private boolean autoConnectAfterPermission;
 
@@ -258,6 +259,21 @@ public class MainActivity extends Activity {
         timeRow.addView(sessionTime);
         card.addView(timeRow, timeRowLp);
 
+        LinearLayout dpiRow = new LinearLayout(this);
+        dpiRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams dpiRowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        dpiRowLp.topMargin = dp(12);
+        dpiRow.addView(text(getString(R.string.dpi), 12, MUTED, false),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        sessionDpi = text(getString(R.string.value_off), 14, TEXT, true);
+        sessionDpi.setId(R.id.session_dpi);
+        LinearLayout.LayoutParams dpiValueLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        dpiValueLp.leftMargin = dp(8);
+        dpiRow.addView(sessionDpi, dpiValueLp);
+        card.addView(dpiRow, dpiRowLp);
+
         LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         cardLp.topMargin = dp(18);
@@ -389,11 +405,14 @@ public class MainActivity extends Activity {
             int visibility = connected ? View.VISIBLE : View.GONE;
             if (sessionCard.getVisibility() != visibility) sessionCard.setVisibility(visibility);
         }
-        if (sessionDevice == null || sessionTunnel == null || sessionTime == null) return;
+        if (sessionDevice == null || sessionTunnel == null || sessionTime == null
+                || sessionDpi == null) return;
         if (!connected) {
             setIfChanged(sessionDevice, getString(R.string.value_none));
             setIfChanged(sessionTunnel, getString(R.string.value_none));
             setIfChanged(sessionTime, getString(R.string.value_none));
+            setIfChanged(sessionDpi, getString(R.string.value_off));
+            if (sessionDpi.getCurrentTextColor() != MUTED) sessionDpi.setTextColor(MUTED);
             return;
         }
 
@@ -407,6 +426,11 @@ public class MainActivity extends Activity {
         long seconds = Math.max(0,
                 (SystemClock.elapsedRealtime() - BypassVpnService.sessionStartedAt) / 1000);
         setIfChanged(sessionTime, formatDuration(seconds));
+
+        boolean dpi = AppSettings.dpiEnabled(this);
+        setIfChanged(sessionDpi, getString(dpi ? R.string.value_on : R.string.value_off));
+        int dpiColor = dpi ? ACCENT : MUTED;
+        if (sessionDpi.getCurrentTextColor() != dpiColor) sessionDpi.setTextColor(dpiColor);
     }
 
     private void setIfChanged(TextView view, String value) {

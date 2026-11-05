@@ -6,8 +6,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 
 /**
- * Local preferences for the app: the two tunnel addresses, auto-connect and the chosen language.
- * Nothing here ever leaves the device.
+ * Local preferences for the app: the two tunnel addresses, auto-connect, the DPI status and the
+ * chosen language. Nothing here ever leaves the device.
  */
 final class AppSettings {
     static final String PREFS = "donut_settings";
@@ -17,6 +17,7 @@ final class AppSettings {
     private static final String KEY_DEVICE_IP = "device_ip";
     private static final String KEY_TUNNEL_IP = "tunnel_ip";
     private static final String KEY_AUTO_CONNECT = "auto_connect";
+    private static final String KEY_DPI = "dpi_enabled";
     private static final String KEY_LANGUAGE = "language";
 
     enum Validation {
@@ -70,6 +71,14 @@ final class AppSettings {
 
     static void setAutoConnect(Context context, boolean enabled) {
         prefs(context).edit().putBoolean(KEY_AUTO_CONNECT, enabled).apply();
+    }
+
+    static boolean dpiEnabled(Context context) {
+        return prefs(context).getBoolean(KEY_DPI, false);
+    }
+
+    static void setDpiEnabled(Context context, boolean enabled) {
+        prefs(context).edit().putBoolean(KEY_DPI, enabled).apply();
     }
 
     /** Empty means "follow the system language". */

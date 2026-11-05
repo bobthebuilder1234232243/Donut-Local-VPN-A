@@ -15,12 +15,14 @@ Project page: **https://techperson1234.github.io/Donut-VPN/**
 2. Press the big button and approve Android's VPN permission once.
 3. The label under the button reads **Connected**. Press the button again to stop; it reads
    **Disconnected**.
-4. While connected, the session card shows the device IP, the tunnel IP and how long the current
-   session has been running. It disappears when you disconnect. Tap the gear to open settings.
+4. While connected, the session card shows the device IP, the tunnel IP, the DPI status and how
+   long the current session has been running. It disappears when you disconnect. Tap the gear to
+   open settings.
 
 ## Settings
 
 - **Auto-connect on launch** starts the local tunnel when the app opens.
+- **Deep Packet Inspection (DPI)** sets the DPI status shown in the connected session card.
 - **Network configuration** lets you change the device IP (the TUN address) and the tunnel IP
   (the local DNS gateway). Both must be valid IPv4 host addresses in the same `/24` subnet, and
   they must differ. The defaults are `10.7.0.1` and `10.7.0.2`. Reconnect the tunnel after
@@ -72,7 +74,7 @@ label reaches `Connected` and returns to `Disconnected`.
 ```
 app/src/main/java/com/donutvpn/donutlocalvpn/
   MainActivity.java        Start/Stop button, session details, settings entry
-  SettingsActivity.java    auto-connect, addresses, languages and connection log
+  SettingsActivity.java    auto-connect, DPI, addresses, languages and connection log
   AppSettings.java         local preferences and IPv4 validation
   ConnectionLog.java       bounded in-memory log shared with the engine
   LocaleHelper.java        in-app language selection

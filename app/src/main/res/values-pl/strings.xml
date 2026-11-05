@@ -13,10 +13,14 @@
     <string name="device_ip">IP urządzenia</string>
     <string name="tunnel_ip">IP tunelu</string>
     <string name="session_time">Czas sesji</string>
+    <string name="value_on">Włączona</string>
+    <string name="value_off">Wyłączona</string>
 
     <string name="connection">Połączenie</string>
     <string name="auto_connect">Łącz automatycznie przy uruchomieniu</string>
     <string name="auto_connect_desc">Uruchamiaj lokalny tunel po otwarciu aplikacji.</string>
+    <string name="dpi">Głęboka inspekcja pakietów (DPI)</string>
+    <string name="dpi_desc">Włącz stan DPI wyświetlany w szczegółach sesji.</string>
 
     <string name="network_config">Konfiguracja sieci</string>
     <string name="network_desc">Oba adresy muszą należeć do tej samej podsieci /24. Adres IP tunelu to lokalna brama DNS.</string>

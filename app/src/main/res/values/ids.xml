@@ -6,4 +6,6 @@
     <item name="session_device_ip" type="id" />
     <item name="session_tunnel_ip" type="id" />
     <item name="session_time" type="id" />
+    <item name="session_dpi" type="id" />
+    <item name="dpi_toggle" type="id" />
 </resources>

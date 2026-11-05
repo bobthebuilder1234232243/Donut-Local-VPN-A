@@ -16,10 +16,14 @@
     <string name="tunnel_ip">Tunnel IP</string>
     <string name="session_time">Session time</string>
     <string name="value_none" translatable="false">—</string>
+    <string name="value_on">On</string>
+    <string name="value_off">Off</string>
 
     <string name="connection">Connection</string>
     <string name="auto_connect">Auto-connect on launch</string>
     <string name="auto_connect_desc">Start the local tunnel when the app opens.</string>
+    <string name="dpi">Deep Packet Inspection (DPI)</string>
+    <string name="dpi_desc">Enable the DPI status shown in session details.</string>
 
     <string name="network_config">Network configuration</string>
     <string name="network_desc">Both addresses must be in the same /24 subnet. The tunnel IP is the local DNS gateway.</string>

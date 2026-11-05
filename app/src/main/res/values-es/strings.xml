@@ -13,10 +13,14 @@
     <string name="device_ip">IP del dispositivo</string>
     <string name="tunnel_ip">IP del túnel</string>
     <string name="session_time">Tiempo de sesión</string>
+    <string name="value_on">Activada</string>
+    <string name="value_off">Desactivada</string>
 
     <string name="connection">Conexión</string>
     <string name="auto_connect">Conectar al iniciar</string>
     <string name="auto_connect_desc">Inicia el túnel local al abrir la aplicación.</string>
+    <string name="dpi">Inspección profunda de paquetes (DPI)</string>
+    <string name="dpi_desc">Activa el estado de DPI que se muestra en los detalles de la sesión.</string>
 
     <string name="network_config">Configuración de red</string>
     <string name="network_desc">Ambas direcciones deben estar en la misma subred /24. La IP del túnel es la puerta de enlace DNS local.</string>

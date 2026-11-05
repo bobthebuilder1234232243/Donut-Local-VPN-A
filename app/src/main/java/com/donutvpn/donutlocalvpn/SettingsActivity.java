@@ -29,8 +29,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 /**
- * Local settings: auto-connect, the two tunnel addresses, the UI language and the in-memory
- * connection log. Everything is stored in the app's private preferences on the device.
+ * Local settings: auto-connect, DPI status, the two tunnel addresses, the UI language and the
+ * in-memory connection log. Everything is stored in the app's private preferences on the device.
  */
 public class SettingsActivity extends Activity {
     private static final int BG = 0xFF0B1020;
@@ -209,6 +209,38 @@ public class SettingsActivity extends Activity {
         row.addView(toggle, toggleLp);
 
         card.addView(row, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout dpiRow = new LinearLayout(this);
+        dpiRow.setGravity(Gravity.CENTER_VERTICAL);
+        dpiRow.setPadding(0, dp(18), 0, 0);
+
+        LinearLayout dpiLabels = new LinearLayout(this);
+        dpiLabels.setOrientation(LinearLayout.VERTICAL);
+        dpiLabels.addView(text(getString(R.string.dpi), 15, TEXT, false));
+        TextView dpiDescription = text(getString(R.string.dpi_desc), 12, MUTED, false);
+        dpiDescription.setLineSpacing(dp(3), 1f);
+        LinearLayout.LayoutParams dpiDescriptionLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        dpiDescriptionLp.topMargin = dp(4);
+        dpiLabels.addView(dpiDescription, dpiDescriptionLp);
+        dpiRow.addView(dpiLabels, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        Switch dpiToggle = new Switch(this);
+        dpiToggle.setId(R.id.dpi_toggle);
+        dpiToggle.setChecked(AppSettings.dpiEnabled(this));
+        dpiToggle.setContentDescription(getString(R.string.dpi));
+        dpiToggle.setThumbTintList(ColorStateList.valueOf(ACCENT));
+        dpiToggle.setTrackTintList(ColorStateList.valueOf(0xFF33405E));
+        dpiToggle.setOnCheckedChangeListener((buttonView, checked) ->
+                AppSettings.setDpiEnabled(SettingsActivity.this, checked));
+        LinearLayout.LayoutParams dpiToggleLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        dpiToggleLp.leftMargin = dp(12);
+        dpiRow.addView(dpiToggle, dpiToggleLp);
+
+        card.addView(dpiRow, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         return card;
     }
